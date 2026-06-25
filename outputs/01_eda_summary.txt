@@ -1,0 +1,59 @@
+SHAPE: (24042, 15)
+
+DTYPES:
+timestamp                      str
+machine_id                   int64
+machine_type                   str
+vibration_rms              float64
+temperature_motor          float64
+current_phase_avg          float64
+pressure_level             float64
+rpm                        float64
+operating_mode                 str
+hours_since_maintenance    float64
+ambient_temp               float64
+rul_hours                  float64
+failure_within_24h           int64
+failure_type                   str
+estimated_repair_cost        int64
+dtype: object
+
+VALEURS MANQUANTES:
+timestamp                     0
+machine_id                    0
+machine_type                  0
+vibration_rms              1000
+temperature_motor           834
+current_phase_avg           731
+pressure_level              924
+rpm                         533
+operating_mode                0
+hours_since_maintenance       0
+ambient_temp                  0
+rul_hours                     0
+failure_within_24h            0
+failure_type                  0
+estimated_repair_cost         0
+dtype: int64
+
+DOUBLONS: 0
+
+DESCRIBE:
+                           count         mean          std     min     25%     50%        75%      max
+machine_id               24042.0    10.505033     5.746455    1.00    6.00   10.00    15.0000    20.00
+vibration_rms            23042.0     1.623667     1.081061    0.35    0.82    1.27     2.2700    10.00
+temperature_motor        23208.0    51.404295    12.519279   28.00   42.61   50.06    59.9625    95.00
+current_phase_avg        23311.0     8.823829     5.366391    2.20    4.63    6.43    13.1200    35.00
+pressure_level           23118.0    59.012233    38.723271   10.10   22.70   46.30    94.7000   206.50
+rpm                      23509.0  1144.849317   912.670971  124.10  489.40  856.00  1676.0000  4098.80
+hours_since_maintenance  24042.0   172.630624   150.722469    0.00   42.87  121.61   295.5750   575.63
+ambient_temp             24042.0    12.996398     2.883994    8.00   10.50   13.00    15.5000    18.00
+rul_hours                24042.0    27.812510    26.393801    0.50    0.50   22.57    46.4100    98.34
+failure_within_24h       24042.0     0.148074     0.355181    0.00    0.00    0.00     0.0000     1.00
+estimated_repair_cost    24042.0   608.870144  1566.793887    0.00    0.00    0.00     0.0000  7995.00
+
+FAILURE_WITHIN_24H distribution:
+failure_within_24h
+0    0.851926
+1    0.148074
+Name: proportion, dtype: float64
