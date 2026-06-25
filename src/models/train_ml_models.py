@@ -8,6 +8,8 @@
 # Modèles comparés :
 # régression logistique (linéaire, très interprétable), Random Forest et Hist Gradient Boosting
 import pandas as pd
+import joblib
+import os
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier, HistGradientBoostingClassifier
 from sklearn.model_selection import StratifiedKFold, cross_val_score
@@ -15,6 +17,7 @@ from sklearn.metrics import recall_score, f1_score, roc_auc_score, average_preci
 import time
 
 PROCESSED_DIR = "data/processed"
+MODELS_DIR = "outputs/models"
 
 
 def load_processed_data():
@@ -100,6 +103,14 @@ def run_ml_comparison():
     print("COMPARAISON DES 3 MODELES ML (tous avec correction du déséquilibre)")
     print("=" * 100)
     print(df_results.to_string(index=False))
+
+    # Sauvegarde des 3 modèles entraînés, pour être réutilisés en D6 (synthèse
+    # finale) sans avoir à les réentraîner depuis zéro.
+    os.makedirs(MODELS_DIR, exist_ok=True)
+    joblib.dump(model_lr, f"{MODELS_DIR}/logreg.pkl")
+    joblib.dump(model_rf, f"{MODELS_DIR}/random_forest.pkl")
+    joblib.dump(model_gb, f"{MODELS_DIR}/hist_gb.pkl")
+    print(f"\nModèles sauvegardés dans {MODELS_DIR}/ (logreg.pkl, random_forest.pkl, hist_gb.pkl)")
 
     return df_results, {"logreg": model_lr, "rf": model_rf, "gb": model_gb}
 
