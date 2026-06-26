@@ -95,7 +95,7 @@ def run_interpretability():
     print("\n" + "=" * 80)
     print("ANALYSE SHAP")
     print("=" * 80)
-    print("Calcul des valeurs SHAP sur un échantillon de 200 lignes du test...")
+    print("Calcul des valeurs SHAP sur un échantillon de 100 lignes du test...")
     shap_values, X_sample = run_shap_analysis(model, X_test)
     print(f"Graphique sauvegardé : {FIGURES_DIR}/06_shap_summary.png")
 

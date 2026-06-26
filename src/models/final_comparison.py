@@ -10,6 +10,7 @@ import numpy as np
 import joblib
 import os
 import time
+import tempfile
 import statistics
 import tensorflow as tf
 from tensorflow import keras
@@ -172,7 +173,7 @@ def measure_computational_cost(X_train, y_train, X_test, n_repeats=5):
         "Hist Gradient Boosting": lambda: HistGradientBoostingClassifier(max_iter=200, max_depth=3, learning_rate=0.1, random_state=42, class_weight="balanced"),
     }
 
-    os.makedirs("/tmp/size_check", exist_ok=True)
+    tmp_dir = tempfile.mkdtemp()
     for name, builder in model_builders.items():
         train_times = []
         for _ in range(n_repeats):
@@ -188,7 +189,7 @@ def measure_computational_cost(X_train, y_train, X_test, n_repeats=5):
         predict_time_ms = (time.time() - t0) / 50 * 1000
 
         # Taille du fichier une fois sérialisé
-        tmp_path = f"/tmp/size_check/{name.replace(' ', '_')}.pkl"
+        tmp_path = os.path.join(tmp_dir, f"{name.replace(' ', '_')}.pkl")
         joblib.dump(model, tmp_path)
         size_kb = os.path.getsize(tmp_path) / 1024
 
@@ -198,13 +199,21 @@ def measure_computational_cost(X_train, y_train, X_test, n_repeats=5):
             "model_size_kb": size_kb,
         }
 
-    # MLP : temps d'entraînement déjà mesuré en D4 (~20-40s par entraînement,
-    # confirmé aussi par les 5 folds de la validation croisée ci-dessus) ;
-    # non répété ici pour éviter un 6e entraînement coûteux et redondant.
+    # MLP : le temps d'entraînement n'est pas remesouré ici (déjà mesuré en D4,
+    # ~20-40s). En revanche, le temps de prédiction ne nécessite aucun
+    # réentraînement - on charge le modèle sauvegardé et on chronomètre.
+    mlp_model = keras.models.load_model(f"{MODELS_DIR}/mlp_model.keras")
+    single_row_np = single_row.values
+    mlp_model.predict(single_row_np, verbose=0)  # warmup : le 1er appel Keras est plus lent
+    t0 = time.time()
+    for _ in range(50):
+        mlp_model.predict(single_row_np, verbose=0)
+    mlp_predict_time_ms = (time.time() - t0) / 50 * 1000
+
     mlp_size_kb = os.path.getsize(f"{MODELS_DIR}/mlp_model.keras") / 1024
     cost["MLP (Deep Learning)"] = {
         "train_time_median_s": np.nan,
-        "predict_time_ms": np.nan,
+        "predict_time_ms": mlp_predict_time_ms,
         "model_size_kb": mlp_size_kb,
     }
 

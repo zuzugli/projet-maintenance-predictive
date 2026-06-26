@@ -1,12 +1,12 @@
-# Dashboard décisionnel 
+# Dashboard décisionnel
 
 # Objectif : interface permettant la saisie d'un scénario,
 # l'affichage de la prédiction, la comparaison des modèles, et l'importance
 # des variables, avec des graphiques interactifs.
 
+import os
 import streamlit as st
 import pandas as pd
-import numpy as np
 import joblib
 import plotly.graph_objects as go
 import plotly.express as px
@@ -15,35 +15,86 @@ st.set_page_config(page_title="Maintenance Prédictive - Dashboard", page_icon="
 
 MODELS_DIR = "outputs/models"
 FIGURES_DIR = "outputs/figures"
+DATA_PATH = "data/raw/predictive_maintenance_v3.csv"
+
+NUMERIC_FEATURES = [
+    "vibration_rms", "temperature_motor", "current_phase_avg",
+    "pressure_level", "rpm", "hours_since_maintenance", "ambient_temp",
+]
+
+FEATURE_LABELS = {
+    "vibration_rms": "Vibration (RMS)",
+    "temperature_motor": "Température moteur (°C)",
+    "current_phase_avg": "Courant électrique (A)",
+    "pressure_level": "Pression",
+    "rpm": "Vitesse de rotation (RPM)",
+    "hours_since_maintenance": "Heures depuis maintenance",
+    "ambient_temp": "Température ambiante (°C)",
+}
+
+MACHINE_DESCRIPTIONS = {
+    "CNC": "Machine-outil à commande numérique (fraisage, tournage).",
+    "Pump": "Pompe industrielle - transfert de fluides.",
+    "Compressor": "Compresseur d'air ou de gaz.",
+    "Robotic Arm": "Bras robotisé pour assemblage ou manutention.",
+}
+
+MODE_DESCRIPTIONS = {
+    "idle": "Veille - machine au ralenti, faible sollicitation.",
+    "normal": "Fonctionnement standard.",
+    "peak": "Charge maximale - risque de surchauffe accru.",
+}
+
+SENSOR_HELP = {
+    "vibration_rms": "Vibrations mécaniques (RMS) - valeur élevée = déséquilibre ou usure des roulements.",
+    "temperature_motor": "Température du bobinage moteur - surchauffe précurseur de panne.",
+    "current_phase_avg": "Intensité électrique moyenne - augmente en cas de surcharge.",
+    "pressure_level": "Pression dans le circuit hydraulique ou pneumatique.",
+    "rpm": "Tours par minute de l'arbre moteur.",
+    "hours_since_maintenance": "Temps depuis la dernière maintenance préventive.",
+    "ambient_temp": "Température ambiante - influe sur le refroidissement de la machine.",
+}
 
 
 @st.cache_resource
 def load_artifacts():
-    # Charge le préprocesseur et le modèle final une seule fois (mis en cache
-    # par Streamlit pour ne pas recharger à chaque interaction utilisateur).
     preprocessor = joblib.load(f"{MODELS_DIR}/preprocessor.pkl")
     model = joblib.load(f"{MODELS_DIR}/final_model.pkl")
     return preprocessor, model
 
 
 @st.cache_data
+def load_raw_data():
+    return pd.read_csv(DATA_PATH)
+
+
+@st.cache_data
 def load_comparison_data():
-    #Recharge les résultats de comparaison des 4 modèles, pour l'onglet
-    # "Comparaison des modèles". Valeurs reprises directement des résultats
-    # obtenus en Phase D, pas recalculées ici pour garder le dashboard rapide à l'usage
     return pd.DataFrame({
         "Modèle": ["Régression Logistique", "Random Forest", "Hist Gradient Boosting (retenu)", "MLP (Deep Learning)"],
         "F1-score": [0.7658, 0.8625, 0.8618, 0.8208],
         "Recall": [0.8062, 0.8989, 0.8890, 0.8427],
         "Precision": [0.7294, 0.8290, 0.8362, 0.8000],
-        "Temps prédiction (ms)": [0.73, 14.39, 2.12, np.nan],
+        "ROC-AUC": [0.9588, 0.9890, 0.9870, 0.9780],
+        "PR-AUC": [0.8376, 0.9415, 0.9356, 0.8871],
+        "Temps prédiction (ms)": [0.73, 14.39, 2.12, 42.44],
         "Taille fichier (Ko)": [1.5, 8531.5, 213.4, 41.3],
     })
 
 
 @st.cache_data
+def load_confusion_matrices():
+    # Valeurs calculées à chaque seuil optimal (maximise F1) sur le test set
+    return {
+        "Régression Logistique":          {"TN": 3884, "FP": 213, "FN": 138, "TP": 574, "seuil": 0.70},
+        "Random Forest":                   {"TN": 3965, "FP": 132, "FN": 72,  "TP": 640, "seuil": 0.65},
+        "Hist Gradient Boosting (retenu)": {"TN": 3973, "FP": 124, "FN": 79,  "TP": 633, "seuil": 0.75},
+        "MLP (Deep Learning)":             {"TN": 3898, "FP": 199, "FN": 94,  "TP": 618, "seuil": 0.80},
+    }
+
+
+@st.cache_data
 def load_feature_importance():
-    # Recharge l'importance des variables
     return pd.DataFrame({
         "Variable": ["Vitesse de rotation (rpm)", "Température moteur", "Courant électrique",
                      "Vibration", "Pression", "Mode 'peak'", "Mode 'idle'",
@@ -53,10 +104,7 @@ def load_feature_importance():
 
 
 def build_input_features(vibration, temperature, current, pressure, rpm,
-                           hours_maintenance, ambient_temp, machine_type, operating_mode):
-    # Construit un DataFrame d'une ligne avec les colonnes brutes exactement 
-    # dans le même format que celui attendu par le preprocessor.pkl 
-    # c'est lui qui se charge ensuite de l'imputation/encodage/scaling
+                          hours_maintenance, ambient_temp, machine_type, operating_mode):
     return pd.DataFrame([{
         "machine_type": machine_type,
         "vibration_rms": vibration,
@@ -76,7 +124,12 @@ def main():
     st.title("🔧 Maintenance Prédictive Industrielle")
     st.caption("Dashboard décisionnel - Projet Data Science")
 
-    tab1, tab2, tab3 = st.tabs(["🎯 Prédiction en temps réel", "📊 Comparaison des modèles", "🔍 Importance des variables"])
+    tab1, tab2, tab3, tab4 = st.tabs([
+        "🎯 Prédiction en temps réel",
+        "📊 Comparaison des modèles",
+        "🔍 Importance des variables",
+        "📈 Exploration des données",
+    ])
 
     # ============================================================
     # ONGLET 1 : SAISIE D'UN SCÉNARIO + PRÉDICTION
@@ -88,20 +141,29 @@ def main():
         col1, col2, col3 = st.columns(3)
         with col1:
             machine_type = st.selectbox("Type de machine", ["CNC", "Pump", "Compressor", "Robotic Arm"])
+            st.caption(MACHINE_DESCRIPTIONS[machine_type])
             operating_mode = st.selectbox("Mode opératoire", ["idle", "normal", "peak"])
-            vibration = st.slider("Vibration (RMS)", 0.3, 10.0, 1.3, 0.1)
+            st.caption(MODE_DESCRIPTIONS[operating_mode])
+            vibration = st.slider("Vibration (RMS)", 0.3, 10.0, 1.3, 0.1,
+                                  help=SENSOR_HELP["vibration_rms"])
         with col2:
-            temperature = st.slider("Température moteur (°C)", 28.0, 95.0, 50.0, 1.0)
-            current = st.slider("Courant électrique moyen (A)", 2.0, 35.0, 6.4, 0.5)
-            pressure = st.slider("Niveau de pression", 10.0, 207.0, 46.0, 1.0)
+            temperature = st.slider("Température moteur (°C)", 28.0, 95.0, 50.0, 1.0,
+                                    help=SENSOR_HELP["temperature_motor"])
+            current = st.slider("Courant électrique moyen (A)", 2.0, 35.0, 6.4, 0.5,
+                                help=SENSOR_HELP["current_phase_avg"])
+            pressure = st.slider("Niveau de pression", 10.0, 207.0, 46.0, 1.0,
+                                 help=SENSOR_HELP["pressure_level"])
         with col3:
-            rpm = st.slider("Vitesse de rotation (RPM)", 124.0, 4100.0, 856.0, 10.0)
-            hours_maintenance = st.slider("Heures depuis dernière maintenance", 0.0, 576.0, 122.0, 1.0)
-            ambient_temp = st.slider("Température ambiante (°C)", 8.0, 18.0, 13.0, 0.5)
+            rpm = st.slider("Vitesse de rotation (RPM)", 124.0, 4100.0, 856.0, 10.0,
+                            help=SENSOR_HELP["rpm"])
+            hours_maintenance = st.slider("Heures depuis dernière maintenance", 0.0, 576.0, 122.0, 1.0,
+                                          help=SENSOR_HELP["hours_since_maintenance"])
+            ambient_temp = st.slider("Température ambiante (°C)", 8.0, 18.0, 13.0, 0.5,
+                                     help=SENSOR_HELP["ambient_temp"])
 
         if st.button("🔍 Estimer le risque de panne", type="primary"):
             X_input = build_input_features(vibration, temperature, current, pressure, rpm,
-                                              hours_maintenance, ambient_temp, machine_type, operating_mode)
+                                           hours_maintenance, ambient_temp, machine_type, operating_mode)
             X_processed = preprocessor.transform(X_input)
             # On remet les noms de colonnes après transform (le modèle a été
             # entraîné avec un DataFrame nommé ; sans ça, sklearn émet un
@@ -124,11 +186,15 @@ def main():
                     mode="gauge+number",
                     value=proba * 100,
                     title={"text": "Risque de panne (%)"},
-                    gauge={"axis": {"range": [0, 100]},
-                           "bar": {"color": "darkred" if proba >= 0.75 else ("orange" if proba >= 0.4 else "green")},
-                           "steps": [{"range": [0, 40], "color": "#d4edda"},
-                                     {"range": [40, 75], "color": "#fff3cd"},
-                                     {"range": [75, 100], "color": "#f8d7da"}]},
+                    gauge={
+                        "axis": {"range": [0, 100]},
+                        "bar": {"color": "darkred" if proba >= 0.75 else ("orange" if proba >= 0.4 else "green")},
+                        "steps": [
+                            {"range": [0, 40], "color": "#d4edda"},
+                            {"range": [40, 75], "color": "#fff3cd"},
+                            {"range": [75, 100], "color": "#f8d7da"},
+                        ],
+                    },
                 ))
                 fig.update_layout(height=250, margin=dict(l=20, r=20, t=40, b=20))
                 st.plotly_chart(fig, use_container_width=True)
@@ -140,7 +206,7 @@ def main():
                 st.success("Le seuil de décision retenu (0.75) classe ce scénario comme **sans risque immédiat**.")
 
     # ============================================================
-    # ONGLET 2 : COMPARAISON DES MODÈLES
+    # ONGLET 2 : COMPARAISON DES MODÈLES + ÉCORESPONSABILITÉ
     # ============================================================
     with tab2:
         st.header("Comparaison des 4 modèles testés")
@@ -148,37 +214,260 @@ def main():
 
         df_comp = load_comparison_data()
         st.dataframe(df_comp.style.format({
-            "F1-score": "{:.4f}", "Recall": "{:.4f}", "Precision": "{:.4f}",
-            "Temps prédiction (ms)": "{:.2f}", "Taille fichier (Ko)": "{:.1f}",
-        }), use_container_width=True)
+            "F1-score": "{:.4f}",
+            "Recall": "{:.4f}",
+            "Precision": "{:.4f}",
+            "ROC-AUC": "{:.4f}",
+            "PR-AUC": "{:.4f}",
+            "Temps prédiction (ms)": "{:.2f}",
+            "Taille fichier (Ko)": "{:.1f}",
+        }, na_rep="N/A"), use_container_width=True)
 
         col1, col2 = st.columns(2)
         with col1:
-            fig_perf = px.bar(df_comp, x="Modèle", y=["F1-score", "Recall", "Precision"],
-                               barmode="group", title="Performance des modèles")
+            fig_perf = px.bar(
+                df_comp, x="Modèle", y=["F1-score", "Recall", "Precision"],
+                barmode="group", title="Performance des modèles",
+            )
             st.plotly_chart(fig_perf, use_container_width=True)
         with col2:
-            fig_cost = px.bar(df_comp, x="Modèle", y="Taille fichier (Ko)",
-                               title="Taille du fichier modèle (Ko, échelle log)", log_y=True)
+            fig_cost = px.bar(
+                df_comp, x="Modèle", y="Taille fichier (Ko)",
+                title="Taille du fichier modèle (Ko, échelle log)", log_y=True,
+            )
             st.plotly_chart(fig_cost, use_container_width=True)
 
+        # --- Matrice de confusion ---
+        st.divider()
+        st.subheader("Matrice de confusion")
+        st.write(
+            "Visualise les **bonnes prédictions** (vert) et les **erreurs** (rouge) "
+            "pour chaque modèle à son seuil de décision optimal."
+        )
+
+        cm_data = load_confusion_matrices()
+        selected_cm = st.selectbox(
+            "Sélectionner un modèle",
+            options=list(cm_data.keys()),
+            index=2,
+            key="cm_model",
+        )
+        cm = cm_data[selected_cm]
+
+        # Matrice 2×2 : couleur verte pour les cases correctes, rouge pour les erreurs
+        fig_cm = go.Figure(go.Heatmap(
+            z=[[1, 0], [0, 1]],
+            x=["Prédit : Pas de panne", "Prédit : Panne"],
+            y=["Réel : Pas de panne", "Réel : Panne"],
+            colorscale=[[0, "#f8d7da"], [1, "#d4edda"]],
+            text=[
+                [f"TN = {cm['TN']}", f"FP = {cm['FP']}"],
+                [f"FN = {cm['FN']}", f"TP = {cm['TP']}"],
+            ],
+            texttemplate="%{text}",
+            textfont={"size": 18},
+            showscale=False,
+        ))
+        fig_cm.update_layout(
+            title=f"Matrice de confusion - {selected_cm} (seuil optimal = {cm['seuil']})",
+            height=320,
+            margin=dict(l=10, r=10, t=50, b=10),
+        )
+        st.plotly_chart(fig_cm, use_container_width=True)
+
+        col_fn, col_fp = st.columns(2)
+        col_fn.metric(
+            "Pannes manquées - FN",
+            cm["FN"],
+            help="Faux Négatifs : la machine va tomber en panne mais le modèle dit 'pas de risque'. Coût le plus élevé.",
+        )
+        col_fp.metric(
+            "Fausses alertes - FP",
+            cm["FP"],
+            help="Faux Positifs : le modèle déclenche une alerte inutile. Coût en interventions préventives non nécessaires.",
+        )
+
+        # --- Écoresponsabilité ---
+        st.divider()
+        st.subheader("Écoresponsabilité des modèles")
+        st.write(
+            "Le choix du modèle ne dépend pas uniquement de la performance prédictive. "
+            "Dans un contexte industriel, **l'empreinte computationnelle** est un critère important : "
+            "un modèle déployé effectue des milliers de prédictions quotidiennes, et son coût "
+            "énergétique s'accumule dans le temps."
+        )
+
+        k1, k2, k3 = st.columns(3)
+        k1.metric("Taille HistGB (retenu)", "213 Ko", delta="-97.5 % vs Random Forest", delta_color="normal")
+        k2.metric("Temps prédiction HistGB", "2.12 ms", delta="-85 % vs Random Forest", delta_color="normal")
+        k3.metric("Taille Random Forest", "8 531 Ko", help="40× plus lourd que HistGB")
+
+        fig_eco = px.bar(
+            df_comp.dropna(subset=["Temps prédiction (ms)"]),
+            x="Modèle", y="Temps prédiction (ms)",
+            color="Modèle",
+            title="Temps de prédiction par modèle (ms) - moins c'est élevé, mieux c'est",
+        )
+        st.plotly_chart(fig_eco, use_container_width=True)
+
+        st.info(
+            "**Conclusion écoresponsabilité :** le modèle **Hist Gradient Boosting** est le plus vertueux - "
+            "il offre les meilleures performances opérationnelles tout en minimisant la taille du modèle "
+            "(213 Ko contre 8,5 Mo pour le Random Forest) et le temps de prédiction (2,12 ms). "
+            "En déploiement industriel, cela se traduit par une consommation énergétique réduite "
+            "pour chaque inférence et des besoins d'infrastructure moindres. "
+            "Le MLP (Deep Learning) présente un coût d'entraînement plus élevé "
+            "sans apporter un gain de performance suffisant pour le justifier sur ce jeu de données."
+        )
+
     # ============================================================
-    # ONGLET 3 : IMPORTANCE DES VARIABLES 
+    # ONGLET 3 : IMPORTANCE DES VARIABLES + SHAP
     # ============================================================
     with tab3:
         st.header("Quelles variables influencent le plus les prédictions ?")
         st.write("Mesuré par Permutation Importance sur le modèle final (Hist Gradient Boosting).")
 
         df_imp = load_feature_importance()
-        fig_imp = px.bar(df_imp.sort_values("Importance"), x="Importance", y="Variable",
-                          orientation="h", title="Importance des variables")
+        fig_imp = px.bar(
+            df_imp.sort_values("Importance"),
+            x="Importance", y="Variable",
+            orientation="h",
+            title="Importance des variables (Permutation Importance)",
+        )
         st.plotly_chart(fig_imp, use_container_width=True)
 
-        st.info("""
-        **Lecture métier :** le modèle se base principalement sur la vitesse de rotation, 
-        la température moteur, le courant électrique et la vibration pour anticiper une panne ;
-        un profil cohérent avec ce qu'un technicien de maintenance surveillerait naturellement. 
-        """)
+        st.info(
+            "**Lecture métier :** le modèle se base principalement sur la vitesse de rotation, "
+            "la température moteur, le courant électrique et la vibration pour anticiper une panne ; "
+            "un profil cohérent avec ce qu'un technicien de maintenance surveillerait naturellement."
+        )
+
+        # --- SHAP ---
+        st.divider()
+        st.subheader("Analyse SHAP - explicabilité individuelle et globale")
+        st.write(
+            "La méthode SHAP (*SHapley Additive exPlanations*) complète la Permutation Importance : "
+            "elle indique non seulement quelles variables comptent, mais aussi dans quel **sens** "
+            "elles orientent la prédiction (vers le risque de panne ou vers la sécurité)."
+        )
+
+        shap_path = os.path.join(FIGURES_DIR, "06_shap_summary.png")
+        if os.path.exists(shap_path):
+            st.image(
+                shap_path,
+                caption="SHAP Summary Plot - rouge : la valeur élevée de la variable pousse vers une prédiction de panne ; bleu : elle pousse vers l'absence de panne.",
+                use_container_width=True,
+            )
+        else:
+            st.warning("Figure SHAP non trouvée. Lancez `src/models/interpretability.py` pour la générer.")
+
+    # ============================================================
+    # ONGLET 4 : EXPLORATION DES DONNÉES
+    # ============================================================
+    with tab4:
+        st.header("Exploration des données")
+        df = load_raw_data()
+        df_labeled = df.copy()
+        df_labeled["Statut"] = df_labeled["failure_within_24h"].map(
+            {0: "Pas de panne", 1: "Panne dans 24h"}
+        )
+
+        # --- KPIs ---
+        st.subheader("Indicateurs clés du dataset")
+        n_total = len(df)
+        n_failure = int(df["failure_within_24h"].sum())
+        n_ok = n_total - n_failure
+        failure_rate = n_failure / n_total * 100
+
+        k1, k2, k3, k4 = st.columns(4)
+        k1.metric("Enregistrements totaux", f"{n_total:,}")
+        k2.metric("Cas avec panne (24h)", f"{n_failure:,}")
+        k3.metric("Taux de panne", f"{failure_rate:.1f}%")
+        k4.metric("Cas sans panne", f"{n_ok:,}")
+
+        st.divider()
+
+        # --- Distributions des capteurs ---
+        st.subheader("Distributions des capteurs par classe")
+        st.write(
+            "Les histogrammes montrent la répartition de chaque capteur selon que la machine "
+            "tombera en panne dans les 24h **(rouge)** ou non **(vert)**. "
+            "Un écart visible entre les deux distributions indique un capteur prédictif."
+        )
+
+        selected_hist = st.selectbox(
+            "Sélectionner un capteur",
+            options=NUMERIC_FEATURES,
+            format_func=lambda x: FEATURE_LABELS[x],
+            key="hist_feature",
+        )
+
+        fig_dist = px.histogram(
+            df_labeled,
+            x=selected_hist,
+            color="Statut",
+            barmode="overlay",
+            opacity=0.7,
+            color_discrete_map={"Pas de panne": "#2ecc71", "Panne dans 24h": "#e74c3c"},
+            labels={selected_hist: FEATURE_LABELS[selected_hist]},
+            title=f"Distribution de « {FEATURE_LABELS[selected_hist]} » selon la classe",
+            nbins=50,
+        )
+        fig_dist.update_layout(legend_title_text="Classe")
+        st.plotly_chart(fig_dist, use_container_width=True)
+
+        # --- Boxplots ---
+        st.subheader("Boxplots : comparaison par classe")
+        selected_box = st.selectbox(
+            "Sélectionner un capteur",
+            options=NUMERIC_FEATURES,
+            format_func=lambda x: FEATURE_LABELS[x],
+            key="box_feature",
+        )
+
+        fig_box = px.box(
+            df_labeled,
+            x="Statut",
+            y=selected_box,
+            color="Statut",
+            color_discrete_map={"Pas de panne": "#2ecc71", "Panne dans 24h": "#e74c3c"},
+            labels={selected_box: FEATURE_LABELS[selected_box]},
+            title=f"Boxplot de « {FEATURE_LABELS[selected_box]} » par classe",
+        )
+        fig_box.update_layout(showlegend=False)
+        st.plotly_chart(fig_box, use_container_width=True)
+
+        st.divider()
+
+        # --- Heatmap de corrélations ---
+        st.subheader("Matrice de corrélations entre les capteurs")
+        st.write(
+            "Une valeur proche de **+1** indique une forte relation positive, "
+            "proche de **-1** une relation inverse, proche de **0** l'absence de relation linéaire."
+        )
+
+        corr_cols = NUMERIC_FEATURES + ["failure_within_24h"]
+        corr_labels = {**FEATURE_LABELS, "failure_within_24h": "Panne 24h"}
+        corr_matrix = df[corr_cols].corr()
+        corr_matrix.index = [corr_labels.get(c, c) for c in corr_matrix.index]
+        corr_matrix.columns = [corr_labels.get(c, c) for c in corr_matrix.columns]
+
+        fig_corr = px.imshow(
+            corr_matrix,
+            color_continuous_scale="RdBu_r",
+            zmin=-1, zmax=1,
+            title="Heatmap de corrélations",
+            text_auto=".2f",
+        )
+        fig_corr.update_layout(height=520)
+        st.plotly_chart(fig_corr, use_container_width=True)
+
+        st.info(
+            "**Points clés :** la température moteur et la vibration sont les variables les plus corrélées "
+            "avec le risque de panne (respectivement 0,39 et 0,26). "
+            "On observe également une forte corrélation entre vibration, courant, pression et RPM (0,62–0,88), "
+            "ce qui s'explique par les différents profils de machines présents dans le dataset."
+        )
 
 
 if __name__ == "__main__":

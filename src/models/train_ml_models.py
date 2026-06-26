@@ -84,6 +84,7 @@ def run_ml_comparison():
 
     # 3. Hist Gradient Boosting (supporte nativement class_weight, contrairement
     # à GradientBoostingClassifier classique)
+    print("[3/3] Hist Gradient Boosting...")
     t0 = time.time()
     model_gb = HistGradientBoostingClassifier(max_iter=200, max_depth=3, learning_rate=0.1,
                                                 random_state=42, class_weight="balanced")
