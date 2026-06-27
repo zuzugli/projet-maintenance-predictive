@@ -320,6 +320,17 @@ def main():
             "sans apporter un gain de performance suffisant pour le justifier sur ce jeu de données."
         )
 
+        # --- Conclusion ---
+        st.divider()
+        st.subheader("Modèle retenu")
+        st.success(
+            "**Hist Gradient Boosting** a été sélectionné comme modèle final. "
+            "Il offre des performances quasi identiques au Random Forest (F1 = 0.862 vs 0.863) "
+            "tout en étant 40x plus léger (213 Ko vs 8,5 Mo) et 7x plus rapide en prédiction (2,12 ms vs 14,39 ms). "
+            "Sa stabilité en validation croisée, sa facilité de déploiement et son interprétabilité native "
+            "en font le meilleur compromis pour un usage industriel."
+        )
+
     # ============================================================
     # ONGLET 3 : IMPORTANCE DES VARIABLES + SHAP
     # ============================================================
