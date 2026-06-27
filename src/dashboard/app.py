@@ -110,14 +110,14 @@ def load_comparison_data():
 
     return pd.DataFrame({
         "Modèle": ["Régression Logistique", "Random Forest", "Hist Gradient Boosting (retenu)", "MLP (Deep Learning)"],
-        "F1-score": [0.7658, 0.8625, 0.8618, 0.8208],
-        "Recall": [0.8062, 0.8989, 0.8890, 0.8427],
-        "Precision": [0.7294, 0.8290, 0.8362, 0.8000],
-        "ROC-AUC": [0.9588, 0.9890, 0.9870, 0.9780],
-        "PR-AUC": [0.8376, 0.9415, 0.9356, 0.8871],
-        "Temps prédiction (ms)": [0.73, 14.39, 2.12, 42.44],
+        "F1-score": [0.7646, 0.8902, 0.9075, 0.8170],
+        "Recall": [0.8624, 0.9284, 0.9438, 0.9031],
+        "Precision": [0.6868, 0.8551, 0.8739, 0.7459],
+        "ROC-AUC": [0.9589, 0.9937, 0.9960, 0.9813],
+        "PR-AUC": [0.8379, 0.9656, 0.9794, 0.8976],
+        "Temps prédiction (ms)": [0.87, 54.05, 4.03, 87.08],
         "Taille fichier (Ko)": [1.5, 8531.5, 213.4, 41.3],
-        "Seuil retenu": [0.70, 0.65, 0.75, 0.80],
+        "Seuil retenu": [0.60, 0.55, 0.60, 0.70],
     })
 
 
@@ -147,10 +147,10 @@ def load_confusion_matrices():
 
     # Valeurs calculées à chaque seuil optimal (maximise F1) sur le test set
     return {
-        "Régression Logistique":          {"TN": 3884, "FP": 213, "FN": 138, "TP": 574, "seuil": 0.70},
-        "Random Forest":                   {"TN": 3965, "FP": 132, "FN": 72,  "TP": 640, "seuil": 0.65},
-        "Hist Gradient Boosting (retenu)": {"TN": 3973, "FP": 124, "FN": 79,  "TP": 633, "seuil": 0.75},
-        "MLP (Deep Learning)":             {"TN": 3898, "FP": 199, "FN": 94,  "TP": 618, "seuil": 0.80},
+        "Régression Logistique":          {"TN": 3817, "FP": 280, "FN": 98, "TP": 614, "seuil": 0.60},
+        "Random Forest":                   {"TN": 3985, "FP": 112, "FN": 51, "TP": 661, "seuil": 0.55},
+        "Hist Gradient Boosting (retenu)": {"TN": 4000, "FP": 97,  "FN": 40, "TP": 672, "seuil": 0.60},
+        "MLP (Deep Learning)":             {"TN": 3878, "FP": 219, "FN": 69, "TP": 643, "seuil": 0.70},
     }
 
 
@@ -397,7 +397,7 @@ def main():
             k3.metric("Taille Random Forest", f"{rf_size:.0f} Ko", help=f"{rf_size/gb_size:.0f}x plus lourd que HistGB")
         else:
             k1.metric("Taille HistGB (retenu)", "213 Ko", delta="-97.5 % vs Random Forest", delta_color="normal")
-            k2.metric("Temps prédiction HistGB", "2.12 ms", delta="-85 % vs Random Forest", delta_color="normal")
+            k2.metric("Temps prédiction HistGB", "4.03 ms", delta="-93 % vs Random Forest", delta_color="normal")
             k3.metric("Taille Random Forest", "8 531 Ko", help="40x plus lourd que HistGB")
 
         fig_eco = px.bar(
@@ -449,8 +449,8 @@ def main():
         else:
             conclusion = (
                 "**Hist Gradient Boosting** a été sélectionné comme modèle final. "
-                "Meilleur compromis performance, légèreté (213 Ko vs 8,5 Mo pour le Random Forest) "
-                "et vitesse de prédiction (2,12 ms vs 14,39 ms). "
+                "Meilleur compromis performance (F1 = 0.908 vs 0.890 pour le Random Forest), "
+                "légèreté (213 Ko vs 8 531 Ko) et vitesse de prédiction (4.03 ms vs 54.05 ms). "
                 "Sa stabilité en validation croisée, sa facilité de déploiement et son interprétabilité native "
                 "en font le meilleur compromis pour un usage industriel."
             )

@@ -292,18 +292,54 @@ Les métriques retenues sont adaptées à une classification déséquilibrée :
 
 Les résultats finaux générés dans `outputs/results/final_test_metrics.csv` sont les suivants :
 
-| Modèle | Seuil | Precision | Recall | F1 | ROC-AUC | PR-AUC | FN | FP |
-|---|---:|---:|---:|---:|---:|---:|---:|---:|
-| Régression Logistique | 0,60 | 0,6868 | 0,8624 | 0,7646 | 0,9589 | 0,8379 | 98 | 280 |
-| Random Forest | 0,55 | 0,8551 | 0,9284 | 0,8902 | 0,9937 | 0,9656 | 51 | 112 |
-| **Hist Gradient Boosting** | **0,60** | **0,8739** | **0,9438** | **0,9075** | **0,9960** | **0,9794** | **40** | **97** |
-| MLP Deep Learning | 0,70 | 0,7459 | 0,9031 | 0,8170 | 0,9813 | 0,8976 | 69 | 219 |
+| Modèle | Seuil | Accuracy | Precision | Recall | F1 | ROC-AUC | PR-AUC | FN | FP |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| Régression Logistique | 0,60 | 0,9214 | 0,6868 | 0,8624 | 0,7646 | 0,9589 | 0,8379 | 98 | 280 |
+| Random Forest | 0,55 | 0,9662 | 0,8551 | 0,9284 | 0,8902 | 0,9937 | 0,9656 | 51 | 112 |
+| **Hist Gradient Boosting** | **0,60** | **0,9716** | **0,8739** | **0,9438** | **0,9075** | **0,9960** | **0,9794** | **40** | **97** |
+| MLP Deep Learning | 0,70 | 0,9401 | 0,7459 | 0,9031 | 0,8170 | 0,9813 | 0,8976 | 69 | 219 |
+
+**Note sur l'Accuracy :** un modèle prédisant systématiquement "pas de panne" obtiendrait 85,2% d'Accuracy (4 096 / 4 808), sans détecter une seule panne. L'Accuracy est donc une métrique trompeuse sur ce dataset déséquilibré (14,8% de pannes) et ne constitue pas le critère de sélection principal. Le F1-score et le Recall sont les métriques déterminantes ici.
 
 Après optimisation des hyperparamètres par RandomizedSearchCV, **Hist Gradient Boosting est le meilleur modèle sur tous les critères** : F1 = 0,908 contre 0,890 pour Random Forest, recall = 0,944 contre 0,928, et seulement 40 FN contre 51 pour Random Forest. L'optimisation a permis un gain de +0,059 point de F1 pour HistGB et +0,033 pour RF par rapport aux hyperparamètres initiaux.
 
 Le choix de **Hist Gradient Boosting** comme modèle final est donc renforcé par le tuning : il surpasse Random Forest sur les métriques de performance tout en étant nettement plus léger et plus rapide. Hist Gradient Boosting pèse 213 Ko contre 8 531 Ko pour Random Forest, et prédit en 4,03 ms contre 54,05 ms. Dans un usage de dashboard ou de service de prédiction appelé fréquemment, ce triple avantage - meilleure performance, déploiement plus simple et empreinte computationnelle réduite - en fait le choix optimal.
 
 Le tuning du seuil est désormais réalisé sur une validation interne du train set, puis appliqué au test set. Cette correction évite de choisir le seuil en regardant directement la performance finale du test.
+
+### Analyse des erreurs
+
+Le test set contient 712 pannes réelles et 4 096 machines saines (4 808 observations au total). L'analyse des erreurs distingue deux types de prédictions incorrectes aux conséquences asymétriques.
+
+**Faux négatifs (FN) - pannes non détectées**
+
+Les FN sont les erreurs les plus coûteuses dans un contexte industriel : une panne non anticipée entraîne un arrêt non planifié, une mobilisation d'urgence et potentiellement des dégâts matériels.
+
+| Modèle | FN | Taux manqué |
+|---|---:|---:|
+| Régression Logistique | 98 | 13,8 % |
+| MLP Deep Learning | 69 | 9,7 % |
+| Random Forest | 51 | 7,2 % |
+| **Hist Gradient Boosting** | **40** | **5,6 %** |
+
+HistGB manque 40 pannes sur 712, soit 5,6 % des défaillances réelles. Ces cas correspondent vraisemblablement à des machines dont les capteurs présentent des valeurs proches des seuils de séparation : un profil globalement normal avec un seul indicateur légèrement dégradé, insuffisant pour déclencher l'alerte. Le dataset étant simulé, ces cas limites peuvent aussi refléter du bruit dans la génération des données plutôt qu'une ambiguïté physique réelle.
+
+**Faux positifs (FP) - fausses alertes**
+
+Les FP génèrent des interventions inutiles et, à terme, une "fatigue d'alerte" chez les opérateurs qui finissent par ignorer les notifications.
+
+| Modèle | FP | Taux fausse alerte |
+|---|---:|---:|
+| Régression Logistique | 280 | 6,8 % |
+| MLP Deep Learning | 219 | 5,3 % |
+| Random Forest | 112 | 2,7 % |
+| **Hist Gradient Boosting** | **97** | **2,4 %** |
+
+HistGB déclenche 97 fausses alertes sur 4 096 machines saines (2,4 %). Ces erreurs correspondent probablement à des machines fonctionnant temporairement en mode "peak" avec des vibrations ou une température élevée, sans qu'une panne soit imminente : le signal capteur est anormal mais sans conséquence réelle.
+
+**Bilan et recommandation opérationnelle**
+
+HistGB minimise les deux types d'erreurs simultanément. Pour un responsable maintenance, cela se traduit par : 40 pannes manquées à surveiller manuellement en complément, et 97 fausses alertes à filtrer. Ce bilan reste gérable à l'échelle d'un parc industriel. Pour réduire davantage les FN, on pourrait abaisser le seuil de décision en dessous de 0,60, au prix d'un nombre de FP légèrement plus élevé.
 
 ---
 
