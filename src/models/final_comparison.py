@@ -2,23 +2,27 @@
 
 # Objectif : recharger les 4 modèles déjà entraînés, les évaluer chacun à
 # son seuil validé sur un split interne du train, et comparer les 6 critères exigés par la consigne :
-# performance, stabilité, interprétabilité, coût de calcul, facilité de déploiement, cohérence métier 
+# performance, stabilité, interprétabilité, coût de calcul, facilité de déploiement, cohérence métier
 # Choix et sauvegarde du modèle final argumenté sur l'ensemble de ces critères
+
+import sys
+from pathlib import Path
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
 
 import pandas as pd
 import numpy as np
 import joblib
-import os
 import time
-import tempfile
 import statistics
 import tensorflow as tf
 from tensorflow import keras
-from sklearn.linear_model import LogisticRegression
-from sklearn.ensemble import RandomForestClassifier, HistGradientBoostingClassifier
+from sklearn.base import clone
 from sklearn.model_selection import StratifiedKFold, cross_val_score
 from sklearn.metrics import precision_score, recall_score, f1_score, roc_auc_score, average_precision_score, confusion_matrix
 from sklearn.utils.class_weight import compute_class_weight
+from src.models.train_mlp import build_mlp
 from src.project_config import MODELS_DIR, PROCESSED_DIR, RESULTS_DIR, ensure_project_dirs, project_relative
 
 tf.random.set_seed(42)
@@ -82,18 +86,19 @@ def evaluate_at_threshold(y_test, y_proba, threshold):
     }
 
 
-def build_mlp(input_dim):
-    # Architecture identique à D4, pour cohérence
-    model = keras.Sequential([
-        keras.layers.Input(shape=(input_dim,)),
-        keras.layers.Dense(32, activation="relu"),
-        keras.layers.Dropout(0.2),
-        keras.layers.Dense(16, activation="relu"),
-        keras.layers.Dropout(0.2),
-        keras.layers.Dense(1, activation="sigmoid"),
-    ])
-    model.compile(optimizer="adam", loss="binary_crossentropy", metrics=["accuracy"])
-    return model
+def load_best_mlp_params():
+    """Recharge les meilleurs hyperparamètres MLP depuis mlp_results.csv."""
+    mlp_results_path = RESULTS_DIR / "mlp_results.csv"
+    if mlp_results_path.exists():
+        row = pd.read_csv(mlp_results_path).iloc[0]
+        return {
+            "units_1": int(row["best_units_1"]),
+            "units_2": int(row["best_units_2"]),
+            "dropout": float(row["best_dropout"]),
+            "learning_rate": float(row["best_learning_rate"]),
+            "batch_size": int(row["best_batch_size"]),
+        }
+    return {"units_1": 32, "units_2": 16, "dropout": 0.1, "learning_rate": 0.001, "batch_size": 64}
 
 
 def cross_validate_mlp(X_train, y_train, n_splits=5):
@@ -108,6 +113,7 @@ def cross_validate_mlp(X_train, y_train, n_splits=5):
     X_train_arr = X_train.values
     y_train_arr = y_train.values
 
+    best_params = load_best_mlp_params()
     for fold_i, (train_idx, val_idx) in enumerate(skf.split(X_train_arr, y_train_arr), 1):
         print(f"  Fold {fold_i}/{n_splits}...")
         X_fold_train, X_fold_val = X_train_arr[train_idx], X_train_arr[val_idx]
@@ -117,9 +123,16 @@ def cross_validate_mlp(X_train, y_train, n_splits=5):
         weights = compute_class_weight(class_weight="balanced", classes=classes, y=y_fold_train)
         class_weight_dict = {0: weights[0], 1: weights[1]}
 
-        model = build_mlp(input_dim=X_fold_train.shape[1])
+        model = build_mlp(
+            input_dim=X_fold_train.shape[1],
+            units_1=best_params["units_1"],
+            units_2=best_params["units_2"],
+            dropout=best_params["dropout"],
+            learning_rate=best_params["learning_rate"],
+        )
         early_stop = keras.callbacks.EarlyStopping(monitor="val_loss", patience=10, restore_best_weights=True)
-        model.fit(X_fold_train, y_fold_train, validation_split=0.2, epochs=100, batch_size=64,
+        model.fit(X_fold_train, y_fold_train, validation_split=0.2, epochs=100,
+                  batch_size=best_params["batch_size"],
                   class_weight=class_weight_dict, callbacks=[early_stop], verbose=0)
 
         y_pred_proba = model.predict(X_fold_val, verbose=0).flatten()
@@ -131,22 +144,18 @@ def cross_validate_mlp(X_train, y_train, n_splits=5):
 
 def measure_stability(X_train, y_train):
     # Critère 2 : stabilité -- validation croisée Stratified K-Fold (5 folds)
-    # sur les 4 modèles, y compris le MLP (plus lent, mais mesuré pour ne
-    # laisser aucun critère incomplet).
+    # sur les modèles avec leurs hyperparamètres optimisés (clonés depuis les pkl).
     skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
     stability = {}
 
-    lr = LogisticRegression(max_iter=1000, random_state=42, class_weight="balanced")
-    scores = cross_val_score(lr, X_train, y_train, cv=skf, scoring="f1")
-    stability["Régression Logistique"] = (scores.mean(), scores.std())
-
-    rf = RandomForestClassifier(n_estimators=200, max_depth=10, random_state=42, class_weight="balanced", n_jobs=-1)
-    scores = cross_val_score(rf, X_train, y_train, cv=skf, scoring="f1")
-    stability["Random Forest"] = (scores.mean(), scores.std())
-
-    gb = HistGradientBoostingClassifier(max_iter=200, max_depth=3, learning_rate=0.1, random_state=42, class_weight="balanced")
-    scores = cross_val_score(gb, X_train, y_train, cv=skf, scoring="f1")
-    stability["Hist Gradient Boosting"] = (scores.mean(), scores.std())
+    sklearn_models = {
+        "Régression Logistique": joblib.load(MODELS_DIR / "logreg.pkl"),
+        "Random Forest": joblib.load(MODELS_DIR / "random_forest.pkl"),
+        "Hist Gradient Boosting": joblib.load(MODELS_DIR / "hist_gb.pkl"),
+    }
+    for name, saved_model in sklearn_models.items():
+        scores = cross_val_score(clone(saved_model), X_train, y_train, cv=skf, scoring="f1")
+        stability[name] = (scores.mean(), scores.std())
 
     print("  Validation croisée du MLP (5 réentraînements, plus lent)...")
     mlp_mean, mlp_std = cross_validate_mlp(X_train, y_train)
@@ -156,25 +165,24 @@ def measure_stability(X_train, y_train):
 
 
 def measure_computational_cost(X_train, y_train, X_test, n_repeats=5):
-    # Critères 4 (coût de calcul) et 5 (facilité de déploiement) : on
-    # réentraîne chaque modèle sklearn n_repeats fois pour mesurer un temps
-    # d'entraînement fiable (médiane, moins sensible aux à-coups système
-    # qu'une moyenne), le temps de prédiction sur une ligne unique (cas
-    # d'usage réel du dashboard), et la taille du fichier une fois sauvegardé
+    # Critères 4 (coût de calcul) et 5 (facilité de déploiement) : réentraîne
+    # les modèles avec leurs hyperparamètres optimisés (clonés depuis les pkl)
+    # pour mesurer les temps d'entraînement et de prédiction. La taille est
+    # lue directement depuis les fichiers sauvegardés.
     cost = {}
     single_row = X_test.iloc[[0]]
 
-    model_builders = {
-        "Régression Logistique": lambda: LogisticRegression(max_iter=1000, random_state=42, class_weight="balanced"),
-        "Random Forest": lambda: RandomForestClassifier(n_estimators=200, max_depth=10, random_state=42, class_weight="balanced", n_jobs=-1),
-        "Hist Gradient Boosting": lambda: HistGradientBoostingClassifier(max_iter=200, max_depth=3, learning_rate=0.1, random_state=42, class_weight="balanced"),
+    sklearn_files = {
+        "Régression Logistique": "logreg.pkl",
+        "Random Forest": "random_forest.pkl",
+        "Hist Gradient Boosting": "hist_gb.pkl",
     }
 
-    tmp_dir = tempfile.mkdtemp()
-    for name, builder in model_builders.items():
+    for name, fname in sklearn_files.items():
+        saved_model = joblib.load(MODELS_DIR / fname)
         train_times = []
         for _ in range(n_repeats):
-            model = builder()
+            model = clone(saved_model)
             t0 = time.time()
             model.fit(X_train, y_train)
             train_times.append(time.time() - t0)
@@ -185,10 +193,8 @@ def measure_computational_cost(X_train, y_train, X_test, n_repeats=5):
             model.predict_proba(single_row)
         predict_time_ms = (time.time() - t0) / 50 * 1000
 
-        # Taille du fichier une fois sérialisé
-        tmp_path = os.path.join(tmp_dir, f"{name.replace(' ', '_')}.pkl")
-        joblib.dump(model, tmp_path)
-        size_kb = os.path.getsize(tmp_path) / 1024
+        # Taille lue depuis le fichier sauvegardé (modèle entraîné sur X_train complet)
+        size_kb = (MODELS_DIR / fname).stat().st_size / 1024
 
         cost[name] = {
             "train_time_median_s": statistics.median(train_times),

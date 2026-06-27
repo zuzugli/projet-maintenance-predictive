@@ -120,13 +120,13 @@ Les fichiers de résultats sont exportés dans `outputs/results/` :
 |---|---|---|---|---|
 | Régression Logistique | 0.765 | 0.862 | 0.959 | 0.60 |
 | Random Forest | 0.890 | 0.928 | 0.994 | 0.55 |
-| **Hist Gradient Boosting (retenu)** | **0.908** | **0.944** | **0.996** | **0.60** |
-| MLP (Deep Learning) | 0.817 | 0.903 | 0.981 | 0.70 |
+| **Hist Gradient Boosting (retenu)** | **0.914** | **0.934** | **0.996** | **0.70** |
+| MLP (Deep Learning) | 0.820 | 0.885 | 0.981 | 0.75 |
 
 Les seuils sont sélectionnés sur un split de validation interne du train set, puis évalués une seule fois sur le test set. Les hyperparamètres sont optimisés par RandomizedSearchCV (modèles sklearn) et recherche aléatoire manuelle (MLP).
 
 **Modèle retenu : Hist Gradient Boosting**
-Après optimisation des hyperparamètres, HistGB est le meilleur modèle sur tous les critères : F1 = 0.908 (vs 0.890 pour RF), 40x plus léger (213 Ko vs 8 531 Ko) et 13x plus rapide en prédiction (4.03 ms vs 54.05 ms).
+Après optimisation des hyperparamètres, HistGB est le meilleur modèle sur tous les critères : F1 = 0.914 (vs 0.890 pour RF), 111x plus léger (344 Ko vs 38 084 Ko) et 13x plus rapide en prédiction (4.08 ms vs 51.53 ms).
 
 ### Variables les plus importantes
 1. Vitesse de rotation (RPM) - 40%

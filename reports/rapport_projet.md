@@ -26,7 +26,7 @@ Le dataset utilisé provient de Kaggle : [Industrial Machine Predictive Maintena
 
 La démarche suivie couvre l'ensemble d'un pipeline Data Science : analyse exploratoire, préparation des données, gestion des valeurs manquantes, encodage, standardisation, entraînement de plusieurs modèles, comparaison quantitative, interprétabilité et intégration dans un dashboard Streamlit. Quatre modèles principaux sont comparés : régression logistique, Random Forest, Hist Gradient Boosting et MLP Deep Learning.
 
-Le modèle final retenu est le **Hist Gradient Boosting**, car il offre le meilleur compromis opérationnel entre performance, rapidité de prédiction, taille du modèle et facilité de déploiement. Les hyperparamètres des modèles sklearn ont été optimisés par RandomizedSearchCV (scoring F1, StratifiedKFold à 3 folds, 20 itérations) et ceux du MLP par recherche aléatoire manuelle (10 combinaisons sur un split de validation interne). Sur l'évaluation finale, après sélection du seuil sur validation interne, Hist Gradient Boosting obtient un F1-score de 0,908, un recall de 0,944 et un ROC-AUC de 0,996 - le meilleur résultat de tous les modèles testés.
+Le modèle final retenu est le **Hist Gradient Boosting**, car il offre le meilleur compromis opérationnel entre performance, rapidité de prédiction, taille du modèle et facilité de déploiement. Les hyperparamètres des modèles sklearn ont été optimisés par RandomizedSearchCV (scoring F1, StratifiedKFold à 3 folds, 20 itérations) et ceux du MLP par recherche aléatoire manuelle (10 combinaisons sur un split de validation interne). Sur l'évaluation finale, après sélection du seuil sur validation interne, Hist Gradient Boosting obtient un F1-score de 0,914, un recall de 0,934 et un ROC-AUC de 0,996 - le meilleur résultat de tous les modèles testés.
 
 L'outil final proposé est un dashboard décisionnel Streamlit permettant de simuler un scénario machine, obtenir une probabilité de panne, comparer les modèles, consulter les matrices de confusion, visualiser les variables influentes et explorer les données. Une API REST n'a pas été implémentée, car elle est optionnelle dans le cahier des charges, mais elle constitue une piste d'industrialisation naturelle.
 
@@ -295,15 +295,15 @@ Les résultats finaux générés dans `outputs/results/final_test_metrics.csv` s
 | Modèle | Seuil | Accuracy | Precision | Recall | F1 | ROC-AUC | PR-AUC | FN | FP |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
 | Régression Logistique | 0,60 | 0,9214 | 0,6868 | 0,8624 | 0,7646 | 0,9589 | 0,8379 | 98 | 280 |
-| Random Forest | 0,55 | 0,9662 | 0,8551 | 0,9284 | 0,8902 | 0,9937 | 0,9656 | 51 | 112 |
-| **Hist Gradient Boosting** | **0,60** | **0,9716** | **0,8739** | **0,9438** | **0,9075** | **0,9960** | **0,9794** | **40** | **97** |
-| MLP Deep Learning | 0,70 | 0,9401 | 0,7459 | 0,9031 | 0,8170 | 0,9813 | 0,8976 | 69 | 219 |
+| Random Forest | 0,55 | 0,9661 | 0,8551 | 0,9284 | 0,8902 | 0,9937 | 0,9656 | 51 | 112 |
+| **Hist Gradient Boosting** | **0,70** | **0,9738** | **0,8938** | **0,9340** | **0,9135** | **0,9960** | **0,9794** | **47** | **79** |
+| MLP Deep Learning | 0,75 | 0,9426 | 0,7646 | 0,8848 | 0,8203 | 0,9813 | 0,8976 | 82 | 194 |
 
 **Note sur l'Accuracy :** un modèle prédisant systématiquement "pas de panne" obtiendrait 85,2% d'Accuracy (4 096 / 4 808), sans détecter une seule panne. L'Accuracy est donc une métrique trompeuse sur ce dataset déséquilibré (14,8% de pannes) et ne constitue pas le critère de sélection principal. Le F1-score et le Recall sont les métriques déterminantes ici.
 
-Après optimisation des hyperparamètres par RandomizedSearchCV, **Hist Gradient Boosting est le meilleur modèle sur tous les critères** : F1 = 0,908 contre 0,890 pour Random Forest, recall = 0,944 contre 0,928, et seulement 40 FN contre 51 pour Random Forest. L'optimisation a permis un gain de +0,059 point de F1 pour HistGB et +0,033 pour RF par rapport aux hyperparamètres initiaux.
+Après optimisation des hyperparamètres par RandomizedSearchCV, **Hist Gradient Boosting est le meilleur modèle sur tous les critères** : F1 = 0,914 contre 0,890 pour Random Forest, recall = 0,934 contre 0,928, et seulement 47 FN contre 51 pour Random Forest. L'optimisation a permis un gain de +0,065 point de F1 pour HistGB et +0,033 pour RF par rapport aux hyperparamètres initiaux.
 
-Le choix de **Hist Gradient Boosting** comme modèle final est donc renforcé par le tuning : il surpasse Random Forest sur les métriques de performance tout en étant nettement plus léger et plus rapide. Hist Gradient Boosting pèse 213 Ko contre 8 531 Ko pour Random Forest, et prédit en 4,03 ms contre 54,05 ms. Dans un usage de dashboard ou de service de prédiction appelé fréquemment, ce triple avantage - meilleure performance, déploiement plus simple et empreinte computationnelle réduite - en fait le choix optimal.
+Le choix de **Hist Gradient Boosting** comme modèle final est donc renforcé par le tuning : il surpasse Random Forest sur les métriques de performance tout en étant nettement plus léger et plus rapide. Hist Gradient Boosting pèse 344 Ko contre 38 084 Ko pour Random Forest, et prédit en 4,08 ms contre 51,53 ms. Dans un usage de dashboard ou de service de prédiction appelé fréquemment, ce triple avantage - meilleure performance, déploiement plus simple et empreinte computationnelle réduite - en fait le choix optimal.
 
 Le tuning du seuil est désormais réalisé sur une validation interne du train set, puis appliqué au test set. Cette correction évite de choisir le seuil en regardant directement la performance finale du test.
 
@@ -318,11 +318,11 @@ Les FN sont les erreurs les plus coûteuses dans un contexte industriel : une pa
 | Modèle | FN | Taux manqué |
 |---|---:|---:|
 | Régression Logistique | 98 | 13,8 % |
-| MLP Deep Learning | 69 | 9,7 % |
+| MLP Deep Learning | 82 | 11,5 % |
 | Random Forest | 51 | 7,2 % |
-| **Hist Gradient Boosting** | **40** | **5,6 %** |
+| **Hist Gradient Boosting** | **47** | **6,6 %** |
 
-HistGB manque 40 pannes sur 712, soit 5,6 % des défaillances réelles. Ces cas correspondent vraisemblablement à des machines dont les capteurs présentent des valeurs proches des seuils de séparation : un profil globalement normal avec un seul indicateur légèrement dégradé, insuffisant pour déclencher l'alerte. Le dataset étant simulé, ces cas limites peuvent aussi refléter du bruit dans la génération des données plutôt qu'une ambiguïté physique réelle.
+HistGB manque 47 pannes sur 712, soit 6,6 % des défaillances réelles. Ces cas correspondent vraisemblablement à des machines dont les capteurs présentent des valeurs proches des seuils de séparation : un profil globalement normal avec un seul indicateur légèrement dégradé, insuffisant pour déclencher l'alerte. Le dataset étant simulé, ces cas limites peuvent aussi refléter du bruit dans la génération des données plutôt qu'une ambiguïté physique réelle.
 
 **Faux positifs (FP) - fausses alertes**
 
@@ -331,15 +331,15 @@ Les FP génèrent des interventions inutiles et, à terme, une "fatigue d'alerte
 | Modèle | FP | Taux fausse alerte |
 |---|---:|---:|
 | Régression Logistique | 280 | 6,8 % |
-| MLP Deep Learning | 219 | 5,3 % |
+| MLP Deep Learning | 194 | 4,7 % |
 | Random Forest | 112 | 2,7 % |
-| **Hist Gradient Boosting** | **97** | **2,4 %** |
+| **Hist Gradient Boosting** | **79** | **1,9 %** |
 
-HistGB déclenche 97 fausses alertes sur 4 096 machines saines (2,4 %). Ces erreurs correspondent probablement à des machines fonctionnant temporairement en mode "peak" avec des vibrations ou une température élevée, sans qu'une panne soit imminente : le signal capteur est anormal mais sans conséquence réelle.
+HistGB déclenche 79 fausses alertes sur 4 097 machines saines (1,9 %). Ces erreurs correspondent probablement à des machines fonctionnant temporairement en mode "peak" avec des vibrations ou une température élevée, sans qu'une panne soit imminente : le signal capteur est anormal mais sans conséquence réelle.
 
 **Bilan et recommandation opérationnelle**
 
-HistGB minimise les deux types d'erreurs simultanément. Pour un responsable maintenance, cela se traduit par : 40 pannes manquées à surveiller manuellement en complément, et 97 fausses alertes à filtrer. Ce bilan reste gérable à l'échelle d'un parc industriel. Pour réduire davantage les FN, on pourrait abaisser le seuil de décision en dessous de 0,60, au prix d'un nombre de FP légèrement plus élevé.
+HistGB minimise les deux types d'erreurs simultanément. Pour un responsable maintenance, cela se traduit par : 47 pannes manquées à surveiller manuellement en complément, et 79 fausses alertes à filtrer. Ce bilan reste gérable à l'échelle d'un parc industriel. Pour réduire davantage les FN, on pourrait abaisser le seuil de décision en dessous de 0,70, au prix d'un nombre de FP légèrement plus élevé.
 
 ---
 
@@ -496,6 +496,7 @@ Le pipeline est traçable : dataset brut, preprocessing, modèles, seuils et mé
 4. Tester des modèles temporels si l'ordre chronologique est exploitable.
 5. Ajouter une tâche secondaire : estimation du `rul_hours` ou classification `failure_type`.
 6. Ajouter des tests automatisés sur le chargement des artefacts et une prédiction type.
+7. Explorer BayesSearch ou Optuna pour un tuning plus efficace des hyperparamètres.
 8. Produire des captures d'écran définitives du dashboard pour la soutenance.
 
 ---
@@ -504,7 +505,7 @@ Le pipeline est traçable : dataset brut, preprocessing, modèles, seuils et mé
 
 Ce projet démontre une démarche Data Science complète appliquée à la maintenance prédictive industrielle. A partir d'un dataset brut Kaggle, la solution réalise une analyse exploratoire, prépare les données, entraîne plusieurs modèles, compare leurs performances, interprète les prédictions et propose un dashboard décisionnel.
 
-Le modèle final retenu est le Hist Gradient Boosting, car il représente le meilleur compromis entre performance, stabilité, coût de calcul, taille du modèle et facilité d'intégration. Après optimisation des hyperparamètres par RandomizedSearchCV, il obtient le meilleur F1-score (0,908) et le meilleur recall (0,944) tout en étant 40 fois plus léger et 13 fois plus rapide que le Random Forest. Le projet montre également que le Deep Learning n'est pas systématiquement supérieur : le MLP obtient des résultats corrects, mais n'apporte pas de gain suffisant par rapport aux modèles d'arbres.
+Le modèle final retenu est le Hist Gradient Boosting, car il représente le meilleur compromis entre performance, stabilité, coût de calcul, taille du modèle et facilité d'intégration. Après optimisation des hyperparamètres par RandomizedSearchCV, il obtient le meilleur F1-score (0,914) et le meilleur recall (0,934) tout en étant 111 fois plus léger et 13 fois plus rapide que le Random Forest. Le projet montre également que le Deep Learning n'est pas systématiquement supérieur : le MLP obtient des résultats corrects, mais n'apporte pas de gain suffisant par rapport aux modèles d'arbres.
 
 La valeur métier de la solution réside dans sa capacité à transformer des signaux capteurs en information actionnable : probabilité de panne, niveau de risque, variables explicatives et comparaison des modèles. La solution reste perfectible, notamment sur l'API, le déploiement et le monitoring, mais elle constitue un MVP solide et explicable.
 

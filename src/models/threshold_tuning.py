@@ -1,11 +1,16 @@
 # Modélisation : ajustement du seuil de décision sans fuite vers le test set.
 
+import sys
+from pathlib import Path
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
 import joblib
 import numpy as np
 import pandas as pd
 import tensorflow as tf
-from sklearn.ensemble import HistGradientBoostingClassifier, RandomForestClassifier
-from sklearn.linear_model import LogisticRegression
+from sklearn.base import clone
 from sklearn.metrics import confusion_matrix, f1_score, precision_score, recall_score
 from sklearn.model_selection import train_test_split
 from sklearn.utils.class_weight import compute_class_weight
@@ -36,48 +41,49 @@ def load_saved_models():
     }
 
 
-def train_threshold_models(X_fit, y_fit):
+def clone_and_fit_models(X_fit, y_fit):
+    """Réentraîne les modèles optimisés (mêmes hyperparamètres) sur X_fit pour choisir le seuil."""
+    # Sklearn : clone avec les hyperparamètres issus de RandomizedSearchCV
+    sklearn_names = {
+        "Régression Logistique": "logreg.pkl",
+        "Random Forest": "random_forest.pkl",
+        "Hist Gradient Boosting": "hist_gb.pkl",
+    }
     models = {}
+    for name, fname in sklearn_names.items():
+        m = clone(joblib.load(MODELS_DIR / fname))
+        m.fit(X_fit, y_fit)
+        models[name] = m
 
-    lr = LogisticRegression(max_iter=1000, random_state=42, class_weight="balanced")
-    lr.fit(X_fit, y_fit)
-    models["Régression Logistique"] = lr
-
-    rf = RandomForestClassifier(
-        n_estimators=200,
-        max_depth=10,
-        random_state=42,
-        class_weight="balanced",
-        n_jobs=-1,
-    )
-    rf.fit(X_fit, y_fit)
-    models["Random Forest"] = rf
-
-    gb = HistGradientBoostingClassifier(
-        max_iter=200,
-        max_depth=3,
-        learning_rate=0.1,
-        random_state=42,
-        class_weight="balanced",
-    )
-    gb.fit(X_fit, y_fit)
-    models["Hist Gradient Boosting"] = gb
+    # MLP : récupère les meilleurs hyperparamètres depuis mlp_results.csv
+    mlp_results_path = RESULTS_DIR / "mlp_results.csv"
+    if mlp_results_path.exists():
+        row = pd.read_csv(mlp_results_path).iloc[0]
+        mlp = build_mlp(
+            input_dim=X_fit.shape[1],
+            units_1=int(row["best_units_1"]),
+            units_2=int(row["best_units_2"]),
+            dropout=float(row["best_dropout"]),
+            learning_rate=float(row["best_learning_rate"]),
+        )
+        batch_size = int(row["best_batch_size"])
+    else:
+        mlp = build_mlp(input_dim=X_fit.shape[1])
+        batch_size = 64
 
     classes = np.array([0, 1])
     weights = compute_class_weight(class_weight="balanced", classes=classes, y=y_fit)
     class_weight_dict = {0: weights[0], 1: weights[1]}
-    mlp = build_mlp(input_dim=X_fit.shape[1])
     early_stop = keras.callbacks.EarlyStopping(
         monitor="val_loss",
         patience=10,
         restore_best_weights=True,
     )
     mlp.fit(
-        X_fit,
-        y_fit,
+        X_fit, y_fit,
         validation_split=0.2,
         epochs=100,
-        batch_size=64,
+        batch_size=batch_size,
         class_weight=class_weight_dict,
         callbacks=[early_stop],
         verbose=0,
@@ -129,8 +135,8 @@ def run_threshold_tuning():
         random_state=42,
     )
 
-    print("Entraînement des modèles dédiés au choix de seuil sur split interne train/validation...")
-    validation_models = train_threshold_models(X_fit, y_fit)
+    print("Réentraînement des modèles optimisés sur split interne train/validation pour choisir le seuil...")
+    validation_models = clone_and_fit_models(X_fit, y_fit)
     full_train_models = load_saved_models()
 
     rows = []

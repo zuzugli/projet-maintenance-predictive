@@ -69,7 +69,7 @@ def load_histgb_threshold():
         row = df[df["model"] == "Hist Gradient Boosting"]
         if not row.empty:
             return float(row["seuil_retenu"].values[0])
-    return 0.60
+    return 0.70
 
 
 @st.cache_resource
@@ -110,14 +110,14 @@ def load_comparison_data():
 
     return pd.DataFrame({
         "Modèle": ["Régression Logistique", "Random Forest", "Hist Gradient Boosting (retenu)", "MLP (Deep Learning)"],
-        "F1-score": [0.7646, 0.8902, 0.9075, 0.8170],
-        "Recall": [0.8624, 0.9284, 0.9438, 0.9031],
-        "Precision": [0.6868, 0.8551, 0.8739, 0.7459],
+        "F1-score": [0.7646, 0.8902, 0.9135, 0.8203],
+        "Recall": [0.8624, 0.9284, 0.9340, 0.8848],
+        "Precision": [0.6868, 0.8551, 0.8938, 0.7646],
         "ROC-AUC": [0.9589, 0.9937, 0.9960, 0.9813],
         "PR-AUC": [0.8379, 0.9656, 0.9794, 0.8976],
-        "Temps prédiction (ms)": [0.87, 54.05, 4.03, 87.08],
-        "Taille fichier (Ko)": [1.5, 8531.5, 213.4, 41.3],
-        "Seuil retenu": [0.60, 0.55, 0.60, 0.70],
+        "Temps prédiction (ms)": [0.66, 51.53, 4.08, 55.81],
+        "Taille fichier (Ko)": [1.5, 38084.0, 343.8, 41.3],
+        "Seuil retenu": [0.60, 0.55, 0.70, 0.75],
     })
 
 
@@ -149,8 +149,8 @@ def load_confusion_matrices():
     return {
         "Régression Logistique":          {"TN": 3817, "FP": 280, "FN": 98, "TP": 614, "seuil": 0.60},
         "Random Forest":                   {"TN": 3985, "FP": 112, "FN": 51, "TP": 661, "seuil": 0.55},
-        "Hist Gradient Boosting (retenu)": {"TN": 4000, "FP": 97,  "FN": 40, "TP": 672, "seuil": 0.60},
-        "MLP (Deep Learning)":             {"TN": 3878, "FP": 219, "FN": 69, "TP": 643, "seuil": 0.70},
+        "Hist Gradient Boosting (retenu)": {"TN": 4018, "FP": 79,  "FN": 47, "TP": 665, "seuil": 0.70},
+        "MLP (Deep Learning)":             {"TN": 3903, "FP": 194, "FN": 82, "TP": 630, "seuil": 0.75},
     }
 
 
@@ -396,9 +396,9 @@ def main():
             k2.metric("Temps prédiction HistGB", f"{gb_time:.2f} ms", delta=f"-{time_pct:.0f} % vs Random Forest", delta_color="normal")
             k3.metric("Taille Random Forest", f"{rf_size:.0f} Ko", help=f"{rf_size/gb_size:.0f}x plus lourd que HistGB")
         else:
-            k1.metric("Taille HistGB (retenu)", "213 Ko", delta="-97.5 % vs Random Forest", delta_color="normal")
-            k2.metric("Temps prédiction HistGB", "4.03 ms", delta="-93 % vs Random Forest", delta_color="normal")
-            k3.metric("Taille Random Forest", "8 531 Ko", help="40x plus lourd que HistGB")
+            k1.metric("Taille HistGB (retenu)", "344 Ko", delta="-99 % vs Random Forest", delta_color="normal")
+            k2.metric("Temps prédiction HistGB", "4.08 ms", delta="-92 % vs Random Forest", delta_color="normal")
+            k3.metric("Taille Random Forest", "38 084 Ko", help="111x plus lourd que HistGB")
 
         fig_eco = px.bar(
             df_comp.dropna(subset=["Temps prédiction (ms)"]),
@@ -449,8 +449,8 @@ def main():
         else:
             conclusion = (
                 "**Hist Gradient Boosting** a été sélectionné comme modèle final. "
-                "Meilleur compromis performance (F1 = 0.908 vs 0.890 pour le Random Forest), "
-                "légèreté (213 Ko vs 8 531 Ko) et vitesse de prédiction (4.03 ms vs 54.05 ms). "
+                "Meilleur compromis performance (F1 = 0.914 vs 0.890 pour le Random Forest), "
+                "légèreté (344 Ko vs 38 084 Ko) et vitesse de prédiction (4.08 ms vs 51.53 ms). "
                 "Sa stabilité en validation croisée, sa facilité de déploiement et son interprétabilité native "
                 "en font le meilleur compromis pour un usage industriel."
             )
@@ -492,7 +492,7 @@ def main():
             st.image(
                 str(shap_path),
                 caption="SHAP Summary Plot - rouge : la valeur élevée de la variable pousse vers une prédiction de panne ; bleu : elle pousse vers l'absence de panne.",
-                use_column_width=True,
+                use_container_width=True,
             )
         else:
             st.warning("Figure SHAP non trouvée. Lancez `src/models/interpretability.py` pour la générer.")
