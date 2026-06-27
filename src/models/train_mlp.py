@@ -3,22 +3,20 @@
 import pandas as pd
 import numpy as np
 import time
-import os
 import tensorflow as tf
 from tensorflow import keras
 from sklearn.metrics import recall_score, f1_score, roc_auc_score, average_precision_score, confusion_matrix
 from sklearn.utils.class_weight import compute_class_weight
-PROCESSED_DIR = "data/processed"
-MODELS_DIR = "outputs/models"
+from src.project_config import MODELS_DIR, PROCESSED_DIR, RESULTS_DIR, ensure_project_dirs, project_relative
 # Seed fixe pour la reproductibilité
 tf.random.set_seed(42)
 np.random.seed(42)
 def load_processed_data():
     # Recharge les données déjà préparées par le pipeline de preprocessing
-    X_train = pd.read_csv(f"{PROCESSED_DIR}/X_train.csv")
-    X_test = pd.read_csv(f"{PROCESSED_DIR}/X_test.csv")
-    y_train = pd.read_csv(f"{PROCESSED_DIR}/y_train.csv").squeeze()
-    y_test = pd.read_csv(f"{PROCESSED_DIR}/y_test.csv").squeeze()
+    X_train = pd.read_csv(PROCESSED_DIR / "X_train.csv")
+    X_test = pd.read_csv(PROCESSED_DIR / "X_test.csv")
+    y_train = pd.read_csv(PROCESSED_DIR / "y_train.csv").squeeze()
+    y_test = pd.read_csv(PROCESSED_DIR / "y_test.csv").squeeze()
     return X_train, X_test, y_train, y_test
 def build_mlp(input_dim):
     # Architecture simple :
@@ -51,6 +49,7 @@ def evaluate(y_test, y_proba):
     }
 def run_mlp():
     # Entraîne le MLP et l'évalue, avec gestion du déséquilibre par class_weight
+    ensure_project_dirs()
     X_train, X_test, y_train, y_test = load_processed_data()
     # class_weight calculé de la même façon que pour les modèles sklearn,
     # mais Keras attend un dictionnaire {classe: poids} plutôt qu'une chaîne "balanced"
@@ -90,9 +89,10 @@ def run_mlp():
 
     # Sauvegarde du modèle entraîné (format Keras natif .keras), pour être
     # réutilisé en D6 (synthèse finale) sans avoir à le réentraîner depuis zéro.
-    os.makedirs(MODELS_DIR, exist_ok=True)
-    model.save(f"{MODELS_DIR}/mlp_model.keras")
-    print(f"\nModèle sauvegardé dans {MODELS_DIR}/mlp_model.keras")
+    model.save(MODELS_DIR / "mlp_model.keras")
+    pd.DataFrame([res]).round(4).to_csv(RESULTS_DIR / "mlp_results.csv", index=False)
+    print(f"\nModèle sauvegardé dans {project_relative(MODELS_DIR / 'mlp_model.keras')}")
+    print(f"Résultats sauvegardés : {project_relative(RESULTS_DIR / 'mlp_results.csv')}")
 
     return model, res
 if __name__ == "__main__":

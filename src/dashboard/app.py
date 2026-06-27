@@ -5,17 +5,22 @@
 # des variables, avec des graphiques interactifs.
 
 import os
+import sys
+from pathlib import Path
+
 import streamlit as st
 import pandas as pd
 import joblib
 import plotly.graph_objects as go
 import plotly.express as px
 
-st.set_page_config(page_title="Maintenance Prédictive - Dashboard", page_icon="🔧", layout="wide")
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
 
-MODELS_DIR = "outputs/models"
-FIGURES_DIR = "outputs/figures"
-DATA_PATH = "data/raw/predictive_maintenance_v3.csv"
+from src.project_config import FIGURES_DIR, MODELS_DIR, PROCESSED_DIR, RESULTS_DIR, resolve_raw_data_path
+
+st.set_page_config(page_title="Maintenance Prédictive - Dashboard", page_icon="🔧", layout="wide")
 
 NUMERIC_FEATURES = [
     "vibration_rms", "temperature_motor", "current_phase_avg",
@@ -58,18 +63,40 @@ SENSOR_HELP = {
 
 @st.cache_resource
 def load_artifacts():
-    preprocessor = joblib.load(f"{MODELS_DIR}/preprocessor.pkl")
-    model = joblib.load(f"{MODELS_DIR}/final_model.pkl")
+    preprocessor = joblib.load(MODELS_DIR / "preprocessor.pkl")
+    model = joblib.load(MODELS_DIR / "final_model.pkl")
     return preprocessor, model
 
 
 @st.cache_data
 def load_raw_data():
-    return pd.read_csv(DATA_PATH)
+    return pd.read_csv(resolve_raw_data_path())
 
 
 @st.cache_data
 def load_comparison_data():
+    comparison_path = RESULTS_DIR / "final_model_comparison.csv"
+    metrics_path = RESULTS_DIR / "final_test_metrics.csv"
+    if comparison_path.exists() and metrics_path.exists():
+        comparison = pd.read_csv(comparison_path)
+        metrics = pd.read_csv(metrics_path)
+        df = comparison.merge(metrics[["model", "precision", "roc_auc", "pr_auc", "seuil_retenu"]], on="model", how="left")
+        df["Modèle"] = df["model"].replace({"Hist Gradient Boosting": "Hist Gradient Boosting (retenu)"})
+        df = df.rename(columns={
+            "f1": "F1-score",
+            "recall": "Recall",
+            "precision": "Precision",
+            "roc_auc": "ROC-AUC",
+            "pr_auc": "PR-AUC",
+            "predict_time_ms": "Temps prédiction (ms)",
+            "model_size_kb": "Taille fichier (Ko)",
+            "seuil_retenu": "Seuil retenu",
+        })
+        return df[[
+            "Modèle", "F1-score", "Recall", "Precision", "ROC-AUC", "PR-AUC",
+            "Temps prédiction (ms)", "Taille fichier (Ko)", "Seuil retenu",
+        ]]
+
     return pd.DataFrame({
         "Modèle": ["Régression Logistique", "Random Forest", "Hist Gradient Boosting (retenu)", "MLP (Deep Learning)"],
         "F1-score": [0.7658, 0.8625, 0.8618, 0.8208],
@@ -79,11 +106,34 @@ def load_comparison_data():
         "PR-AUC": [0.8376, 0.9415, 0.9356, 0.8871],
         "Temps prédiction (ms)": [0.73, 14.39, 2.12, 42.44],
         "Taille fichier (Ko)": [1.5, 8531.5, 213.4, 41.3],
+        "Seuil retenu": [0.70, 0.65, 0.75, 0.80],
     })
 
 
 @st.cache_data
 def load_confusion_matrices():
+    metrics_path = RESULTS_DIR / "final_test_metrics.csv"
+    y_test_path = PROCESSED_DIR / "y_test.csv"
+    if metrics_path.exists() and y_test_path.exists():
+        metrics = pd.read_csv(metrics_path)
+        y_test = pd.read_csv(y_test_path).squeeze()
+        positives = int(y_test.sum())
+        negatives = int((y_test == 0).sum())
+        matrices = {}
+        for _, row in metrics.iterrows():
+            model_name = row["model"]
+            display_name = "Hist Gradient Boosting (retenu)" if model_name == "Hist Gradient Boosting" else model_name
+            fn = int(row["FN"])
+            fp = int(row["FP"])
+            matrices[display_name] = {
+                "TN": negatives - fp,
+                "FP": fp,
+                "FN": fn,
+                "TP": positives - fn,
+                "seuil": row["seuil_retenu"],
+            }
+        return matrices
+
     # Valeurs calculées à chaque seuil optimal (maximise F1) sur le test set
     return {
         "Régression Logistique":          {"TN": 3884, "FP": 213, "FN": 138, "TP": 574, "seuil": 0.70},
@@ -95,6 +145,24 @@ def load_confusion_matrices():
 
 @st.cache_data
 def load_feature_importance():
+    importance_path = RESULTS_DIR / "feature_importance.csv"
+    if importance_path.exists():
+        df = pd.read_csv(importance_path)
+        feature_labels = {
+            "num__rpm": "Vitesse de rotation (rpm)",
+            "num__temperature_motor": "Température moteur",
+            "num__current_phase_avg": "Courant électrique",
+            "num__vibration_rms": "Vibration",
+            "num__pressure_level": "Pression",
+            "cat__operating_mode_peak": "Mode 'peak'",
+            "cat__operating_mode_idle": "Mode 'idle'",
+            "num__hours_since_maintenance": "Heures depuis maintenance",
+            "num__ambient_temp": "Température ambiante",
+        }
+        df["Variable"] = df["feature"].map(lambda x: feature_labels.get(x, x.replace("num__", "").replace("cat__", "")))
+        df["Importance"] = df["importance_mean"]
+        return df[["Variable", "Importance"]].sort_values("Importance", ascending=False).head(10)
+
     return pd.DataFrame({
         "Variable": ["Vitesse de rotation (rpm)", "Température moteur", "Courant électrique",
                      "Vibration", "Pression", "Mode 'peak'", "Mode 'idle'",
@@ -119,7 +187,12 @@ def build_input_features(vibration, temperature, current, pressure, rpm,
 
 
 def main():
-    preprocessor, model = load_artifacts()
+    try:
+        preprocessor, model = load_artifacts()
+    except FileNotFoundError as exc:
+        st.error("Artefacts modèle introuvables. Lancez `python scripts/run_pipeline.py` depuis la racine du projet.")
+        st.exception(exc)
+        st.stop()
 
     st.title("🔧 Maintenance Prédictive Industrielle")
     st.caption("Dashboard décisionnel - Projet Data Science")
@@ -362,12 +435,12 @@ def main():
             "elles orientent la prédiction (vers le risque de panne ou vers la sécurité)."
         )
 
-        shap_path = os.path.join(FIGURES_DIR, "06_shap_summary.png")
+        shap_path = FIGURES_DIR / "06_shap_summary.png"
         if os.path.exists(shap_path):
             st.image(
-                shap_path,
+                str(shap_path),
                 caption="SHAP Summary Plot - rouge : la valeur élevée de la variable pousse vers une prédiction de panne ; bleu : elle pousse vers l'absence de panne.",
-                use_container_width=True,
+                use_column_width=True,
             )
         else:
             st.warning("Figure SHAP non trouvée. Lancez `src/models/interpretability.py` pour la générer.")

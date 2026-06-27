@@ -1,7 +1,7 @@
 # Modélisation : Synthèse finale
 
-# Objectif : recharger les 4 modèles déjà entraînés, les évaluer chacun à 
-# son meilleur seuil, et comparer les 6 critères exigés par la consigne : 
+# Objectif : recharger les 4 modèles déjà entraînés, les évaluer chacun à
+# son seuil validé sur un split interne du train, et comparer les 6 critères exigés par la consigne :
 # performance, stabilité, interprétabilité, coût de calcul, facilité de déploiement, cohérence métier 
 # Choix et sauvegarde du modèle final argumenté sur l'ensemble de ces critères
 
@@ -19,9 +19,7 @@ from sklearn.ensemble import RandomForestClassifier, HistGradientBoostingClassif
 from sklearn.model_selection import StratifiedKFold, cross_val_score
 from sklearn.metrics import precision_score, recall_score, f1_score, roc_auc_score, average_precision_score, confusion_matrix
 from sklearn.utils.class_weight import compute_class_weight
-
-PROCESSED_DIR = "data/processed"
-MODELS_DIR = "outputs/models"
+from src.project_config import MODELS_DIR, PROCESSED_DIR, RESULTS_DIR, ensure_project_dirs, project_relative
 
 tf.random.set_seed(42)
 np.random.seed(42)
@@ -29,20 +27,20 @@ np.random.seed(42)
 
 def load_processed_data():
     # Recharge les données déjà préparées par le pipeline de preprocessing
-    X_train = pd.read_csv(f"{PROCESSED_DIR}/X_train.csv")
-    X_test = pd.read_csv(f"{PROCESSED_DIR}/X_test.csv")
-    y_train = pd.read_csv(f"{PROCESSED_DIR}/y_train.csv").squeeze()
-    y_test = pd.read_csv(f"{PROCESSED_DIR}/y_test.csv").squeeze()
+    X_train = pd.read_csv(PROCESSED_DIR / "X_train.csv")
+    X_test = pd.read_csv(PROCESSED_DIR / "X_test.csv")
+    y_train = pd.read_csv(PROCESSED_DIR / "y_train.csv").squeeze()
+    y_test = pd.read_csv(PROCESSED_DIR / "y_test.csv").squeeze()
     return X_train, X_test, y_train, y_test
 
 
 def load_all_models():
     # Recharge les 3 modèles sklearn (.pkl) et le MLP (.keras), déjà entraînés
     models = {
-        "Régression Logistique": joblib.load(f"{MODELS_DIR}/logreg.pkl"),
-        "Random Forest": joblib.load(f"{MODELS_DIR}/random_forest.pkl"),
-        "Hist Gradient Boosting": joblib.load(f"{MODELS_DIR}/hist_gb.pkl"),
-        "MLP (Deep Learning)": keras.models.load_model(f"{MODELS_DIR}/mlp_model.keras"),
+        "Régression Logistique": joblib.load(MODELS_DIR / "logreg.pkl"),
+        "Random Forest": joblib.load(MODELS_DIR / "random_forest.pkl"),
+        "Hist Gradient Boosting": joblib.load(MODELS_DIR / "hist_gb.pkl"),
+        "MLP (Deep Learning)": keras.models.load_model(MODELS_DIR / "mlp_model.keras"),
     }
     return models
 
@@ -56,25 +54,24 @@ def get_proba(model, model_name, X_test):
         return model.predict_proba(X_test)[:, 1]
 
 
-def find_best_threshold(y_test, y_proba):
-    # Teste une grille de seuils (0.05 à 0.95) et renvoie celui qui maximise le F1
-    best_f1, best_t = -1, 0.5
-    for t in np.arange(0.05, 1.0, 0.05):
-        y_pred = (y_proba >= t).astype(int)
-        f1 = f1_score(y_test, y_pred)
-        if f1 > best_f1:
-            best_f1, best_t = f1, t
-    return round(best_t, 2)
+def load_selected_thresholds():
+    threshold_path = RESULTS_DIR / "threshold_tuning.csv"
+    if not threshold_path.exists():
+        raise FileNotFoundError(
+            "Le fichier de seuils validés est introuvable. "
+            "Lancez d'abord `python src/models/threshold_tuning.py`."
+        )
+    df_thresholds = pd.read_csv(threshold_path)
+    return dict(zip(df_thresholds["model"], df_thresholds["selected_threshold"]))
 
 
-def evaluate_at_best_threshold(y_test, y_proba):
-    # Applique le meilleur seuil trouvé, puis calcule les métriques de
-    # performance à ce seuil
-    best_t = find_best_threshold(y_test, y_proba)
-    y_pred = (y_proba >= best_t).astype(int)
+def evaluate_at_threshold(y_test, y_proba, threshold):
+    # Applique un seuil choisi sur validation, puis calcule les métriques de
+    # performance sur le test set.
+    y_pred = (y_proba >= threshold).astype(int)
     cm = confusion_matrix(y_test, y_pred)
     return {
-        "seuil_retenu": best_t,
+        "seuil_retenu": threshold,
         "precision": precision_score(y_test, y_pred, zero_division=0),
         "recall": recall_score(y_test, y_pred),
         "f1": f1_score(y_test, y_pred),
@@ -202,7 +199,7 @@ def measure_computational_cost(X_train, y_train, X_test, n_repeats=5):
     # MLP : le temps d'entraînement n'est pas remesouré ici (déjà mesuré en D4,
     # ~20-40s). En revanche, le temps de prédiction ne nécessite aucun
     # réentraînement - on charge le modèle sauvegardé et on chronomètre.
-    mlp_model = keras.models.load_model(f"{MODELS_DIR}/mlp_model.keras")
+    mlp_model = keras.models.load_model(MODELS_DIR / "mlp_model.keras")
     single_row_np = single_row.values
     mlp_model.predict(single_row_np, verbose=0)  # warmup : le 1er appel Keras est plus lent
     t0 = time.time()
@@ -210,7 +207,7 @@ def measure_computational_cost(X_train, y_train, X_test, n_repeats=5):
         mlp_model.predict(single_row_np, verbose=0)
     mlp_predict_time_ms = (time.time() - t0) / 50 * 1000
 
-    mlp_size_kb = os.path.getsize(f"{MODELS_DIR}/mlp_model.keras") / 1024
+    mlp_size_kb = (MODELS_DIR / "mlp_model.keras").stat().st_size / 1024
     cost["MLP (Deep Learning)"] = {
         "train_time_median_s": np.nan,
         "predict_time_ms": mlp_predict_time_ms,
@@ -222,20 +219,22 @@ def measure_computational_cost(X_train, y_train, X_test, n_repeats=5):
 
 def run_final_comparison():
     # Compare les 4 modèles sur les 6 critères de la consigne, choisit et sauvegarde le modèle final
+    ensure_project_dirs()
     X_train, X_test, y_train, y_test = load_processed_data()
     models = load_all_models()
+    selected_thresholds = load_selected_thresholds()
 
     # Critère 1 : performance 
     perf_results = []
     for name, model in models.items():
         y_proba = get_proba(model, name, X_test)
-        res = evaluate_at_best_threshold(y_test, y_proba)
+        res = evaluate_at_threshold(y_test, y_proba, selected_thresholds[name])
         res["model"] = name
         perf_results.append(res)
     df_perf = pd.DataFrame(perf_results).set_index("model")
 
     print("\n" + "=" * 110)
-    print("CRITERE 1 - PERFORMANCE (à chaque meilleur seuil)")
+    print("CRITERE 1 - PERFORMANCE (seuil choisi sur validation, score final sur test)")
     print("=" * 110)
     print(df_perf.round(4).to_string())
 
@@ -282,10 +281,22 @@ Critères non quantifiables directement par le code, discutés qualitativement :
     # (écart de F1 < 0.001), mais net avantage sur le coût de calcul et le
     # déploiement
     final_model = models["Hist Gradient Boosting"]
-    os.makedirs(MODELS_DIR, exist_ok=True)
-    joblib.dump(final_model, f"{MODELS_DIR}/final_model.pkl")
+    joblib.dump(final_model, MODELS_DIR / "final_model.pkl")
+    df_summary.to_csv(RESULTS_DIR / "final_model_comparison.csv", index=False)
+    df_perf.reset_index().round(4).to_csv(RESULTS_DIR / "final_test_metrics.csv", index=False)
+
+    selection_note = (
+        "# Choix du modèle final\n\n"
+        "Modèle retenu : Hist Gradient Boosting.\n\n"
+        "Justification : performance très proche du Random Forest, coût de prédiction "
+        "nettement plus faible, taille de fichier réduite et intégration Streamlit simple. "
+        "Les seuils de décision utilisés pour l'évaluation finale ont été sélectionnés sur "
+        "une validation interne du train set, puis appliqués une seule fois au test set.\n"
+    )
+    (RESULTS_DIR / "final_model_selection.md").write_text(selection_note, encoding="utf-8")
     print(f">>> MODÈLE FINAL RETENU : Hist Gradient Boosting")
-    print(f">>> Sauvegardé dans {MODELS_DIR}/final_model.pkl")
+    print(f">>> Sauvegardé dans {project_relative(MODELS_DIR / 'final_model.pkl')}")
+    print(f">>> Comparaison sauvegardée : {project_relative(RESULTS_DIR / 'final_model_comparison.csv')}")
 
     return df_summary
 

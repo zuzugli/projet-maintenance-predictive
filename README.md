@@ -8,7 +8,9 @@ Prédiction de pannes machines dans les 24h à partir de données capteurs, avec
 
 Données capteurs temps réel (vibration, température, courant, pression, RPM...) issues de 4 types de machines industrielles. L'objectif est de prédire si une panne surviendra dans les 24h pour permettre une maintenance préventive.
 
-Dataset : `data/raw/predictive_maintenance_v3.csv` (~24 000 enregistrements, ~19% de pannes)
+Dataset : `data/raw/predictive_maintenance_v3.csv` (24 042 enregistrements, 14,8% de pannes).
+
+Source Kaggle : <https://www.kaggle.com/datasets/tatheerabbas/industrial-machine-predictive-maintenance?resource=download>
 
 ---
 
@@ -31,19 +33,34 @@ Dataset : `data/raw/predictive_maintenance_v3.csv` (~24 000 enregistrements, ~19
 │       ├── threshold_tuning.py # Ajustement du seuil de décision (maximise le F1)
 │       ├── final_comparison.py # Comparaison finale 6 critères + sauvegarde du modèle retenu
 │       ├── interpretability.py # Permutation Importance + SHAP
-│       └── dashboard/
-│           └── app.py          # Dashboard Streamlit
+├── src/dashboard/
+│   └── app.py                  # Dashboard Streamlit
+├── scripts/
+│   └── run_pipeline.py         # Régénération complète des artefacts
 ├── outputs/
 │   ├── models/                 # Modèles sauvegardés (.pkl, .keras)
+│   ├── results/                # Métriques et comparaisons exportées (.csv)
 │   └── figures/                # Graphiques générés (dont SHAP)
+├── reports/
+│   └── rapport_projet.md       # Rapport analytique structuré
 └── requirements.txt
 ```
 
 ---
 
+## Rapport
+
+Le rapport analytique complet est disponible ici : [reports/rapport_projet.md](reports/rapport_projet.md)
+
+---
+
 ## Installation
 
+Python recommandé : 3.10 à 3.12. TensorFlow n'est pas encore compatible avec tous les environnements Python très récents.
+
 ```bash
+python -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
@@ -51,22 +68,49 @@ pip install -r requirements.txt
 
 ## Lancer le dashboard
 
+Si les artefacts `outputs/models/preprocessor.pkl` et `outputs/models/final_model.pkl`
+ne sont pas encore présents, lancez d'abord le pipeline complet.
+
 ```bash
 streamlit run src/dashboard/app.py
 ```
 
 ---
 
-## Pipeline d'entraînement (ordre d'exécution)
+## Pipeline complet reproductible
+
+Commande recommandée :
 
 ```bash
-python src/preprocessing/pipeline.py
-python src/models/train_ml_models.py
-python src/models/train_mlp.py
-python src/models/threshold_tuning.py
-python src/models/final_comparison.py
-python src/models/interpretability.py
+python scripts/run_pipeline.py
 ```
+
+Le script lit automatiquement le dataset depuis :
+1. `data/raw/predictive_maintenance_v3.csv` si présent ;
+2. `../archive/predictive_maintenance_v3.csv` en fallback local.
+
+Ordre d'exécution détaillé :
+
+```bash
+python -m src.preprocessing.pipeline
+python -m src.models.baseline
+python -m src.models.rebalancing
+python -m src.models.train_ml_models
+python -m src.models.train_mlp
+python -m src.models.threshold_tuning
+python -m src.models.final_comparison
+python -m src.models.interpretability
+```
+
+Les fichiers de résultats sont exportés dans `outputs/results/` :
+- `baseline_results.csv`
+- `rebalancing_comparison.csv`
+- `ml_models_comparison.csv`
+- `mlp_results.csv`
+- `threshold_tuning.csv`
+- `final_model_comparison.csv`
+- `final_test_metrics.csv`
+- `feature_importance.csv`
 
 ---
 
@@ -74,13 +118,15 @@ python src/models/interpretability.py
 
 | Modèle | F1 | Recall | ROC-AUC | Seuil retenu |
 |---|---|---|---|---|
-| Régression Logistique | 0.766 | 0.806 | 0.959 | 0.70 |
-| Random Forest | 0.863 | 0.899 | 0.989 | 0.65 |
-| **Hist Gradient Boosting (retenu)** | **0.862** | **0.889** | **0.987** | **0.75** |
-| MLP (Deep Learning) | 0.821 | 0.843 | 0.978 | 0.80 |
+| Régression Logistique | 0.763 | 0.860 | 0.959 | 0.60 |
+| Random Forest | 0.857 | 0.928 | 0.989 | 0.55 |
+| **Hist Gradient Boosting (retenu)** | **0.848** | **0.926** | **0.986** | **0.65** |
+| MLP (Deep Learning) | 0.785 | 0.920 | 0.974 | 0.70 |
+
+Les seuils de décision sont désormais sélectionnés sur une validation interne du train set, puis évalués sur le test set dans la comparaison finale.
 
 **Modèle retenu : Hist Gradient Boosting**
-Performance quasi identique au Random Forest, mais 40x plus léger (213 Ko vs 8,5 Mo) et 7x plus rapide en prédiction (2,12 ms vs 14,39 ms).
+Random Forest obtient le meilleur F1-score, mais Hist Gradient Boosting est retenu comme meilleur compromis : écart faible de performance, modèle environ 40x plus léger (215 Ko vs 8,5 Mo) et environ 13x plus rapide en prédiction (2,28 ms vs 29,57 ms).
 
 ### Variables les plus importantes
 1. Vitesse de rotation (RPM) - 41%
@@ -97,3 +143,5 @@ Performance quasi identique au Random Forest, mais 40x plus léger (213 Ko vs 8,
 - **Comparaison des modèles** - métriques, matrices de confusion, bilan écoresponsabilité
 - **Importance des variables** - Permutation Importance + SHAP
 - **Exploration des données** - distributions, boxplots, heatmap de corrélations
+
+Le dashboard charge en priorité les métriques générées dans `outputs/results/`. Si elles ne sont pas encore présentes, il conserve des valeurs de démonstration.

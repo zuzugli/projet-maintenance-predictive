@@ -1,9 +1,11 @@
 venv/
+.venv/
+.python/
 __pycache__/
 *.pyc
 .ipynb_checkpoints/
-data/raw/*.csv
-outputs/models/*.pkl
+# Le dataset Kaggle est petit et nécessaire pour relancer le pipeline.
+# Les .pkl sont nécessaires pour démarrer le dashboard sans réentraînement.
 outputs/models/*.h5
 .DS_Store
 *.env

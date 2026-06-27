@@ -1,0 +1,5 @@
+model,selected_threshold,validation_precision,validation_recall,validation_f1,validation_FN,validation_FP,test_f1_threshold_0_5,test_FN_threshold_0_5,test_FP_threshold_0_5,test_precision,test_recall,test_f1,test_FN,test_FP
+Régression Logistique,0.6,0.707,0.8298,0.7635,97,196,0.7468,75,357,0.6861,0.8596,0.7631,100,280
+Random Forest,0.55,0.8401,0.9035,0.8707,55,98,0.844,41,207,0.7964,0.9284,0.8573,51,169
+Hist Gradient Boosting,0.65,0.8433,0.9158,0.878,48,97,0.8254,36,250,0.7827,0.9256,0.8481,53,183
+MLP (Deep Learning),0.7,0.7722,0.9158,0.8379,48,154,0.7609,34,392,0.6851,0.9199,0.7854,57,301

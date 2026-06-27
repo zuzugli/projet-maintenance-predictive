@@ -1,0 +1,4 @@
+model,recall,f1,roc_auc,pr_auc,FN,FP,cv_f1_mean,cv_f1_std,train_time_s
+Régression Logistique,0.8947,0.7468,0.9588,0.8376,75,357,0.7454,0.0104,2.2837
+Random Forest,0.9424,0.844,0.9886,0.9394,41,207,0.8539,0.0078,3.1456
+Hist Gradient Boosting,0.9494,0.8254,0.9861,0.928,36,250,0.8437,0.0102,1.1902

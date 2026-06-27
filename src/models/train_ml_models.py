@@ -9,23 +9,20 @@
 # régression logistique (linéaire, très interprétable), Random Forest et Hist Gradient Boosting
 import pandas as pd
 import joblib
-import os
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier, HistGradientBoostingClassifier
 from sklearn.model_selection import StratifiedKFold, cross_val_score
 from sklearn.metrics import recall_score, f1_score, roc_auc_score, average_precision_score, confusion_matrix
 import time
-
-PROCESSED_DIR = "data/processed"
-MODELS_DIR = "outputs/models"
+from src.project_config import MODELS_DIR, PROCESSED_DIR, RESULTS_DIR, ensure_project_dirs, project_relative
 
 
 def load_processed_data():
     # Recharge les données déjà préparées par le pipeline de preprocessing
-    X_train = pd.read_csv(f"{PROCESSED_DIR}/X_train.csv")
-    X_test = pd.read_csv(f"{PROCESSED_DIR}/X_test.csv")
-    y_train = pd.read_csv(f"{PROCESSED_DIR}/y_train.csv").squeeze()
-    y_test = pd.read_csv(f"{PROCESSED_DIR}/y_test.csv").squeeze()
+    X_train = pd.read_csv(PROCESSED_DIR / "X_train.csv")
+    X_test = pd.read_csv(PROCESSED_DIR / "X_test.csv")
+    y_train = pd.read_csv(PROCESSED_DIR / "y_train.csv").squeeze()
+    y_test = pd.read_csv(PROCESSED_DIR / "y_test.csv").squeeze()
     return X_train, X_test, y_train, y_test
 
 
@@ -56,6 +53,7 @@ def cross_validate_model(model, X_train, y_train):
 
 def run_ml_comparison():
     # entraîne et compare les 3 modèles ML, tous avec class_weight='balanced'
+    ensure_project_dirs()
     X_train, X_test, y_train, y_test = load_processed_data()
 
     results = []
@@ -107,11 +105,12 @@ def run_ml_comparison():
 
     # Sauvegarde des 3 modèles entraînés, pour être réutilisés en D6 (synthèse
     # finale) sans avoir à les réentraîner depuis zéro.
-    os.makedirs(MODELS_DIR, exist_ok=True)
-    joblib.dump(model_lr, f"{MODELS_DIR}/logreg.pkl")
-    joblib.dump(model_rf, f"{MODELS_DIR}/random_forest.pkl")
-    joblib.dump(model_gb, f"{MODELS_DIR}/hist_gb.pkl")
-    print(f"\nModèles sauvegardés dans {MODELS_DIR}/ (logreg.pkl, random_forest.pkl, hist_gb.pkl)")
+    joblib.dump(model_lr, MODELS_DIR / "logreg.pkl")
+    joblib.dump(model_rf, MODELS_DIR / "random_forest.pkl")
+    joblib.dump(model_gb, MODELS_DIR / "hist_gb.pkl")
+    df_results.to_csv(RESULTS_DIR / "ml_models_comparison.csv", index=False)
+    print(f"\nModèles sauvegardés dans {project_relative(MODELS_DIR)}/ (logreg.pkl, random_forest.pkl, hist_gb.pkl)")
+    print(f"Résultats sauvegardés : {project_relative(RESULTS_DIR / 'ml_models_comparison.csv')}")
 
     return df_results, {"logreg": model_lr, "rf": model_rf, "gb": model_gb}
 

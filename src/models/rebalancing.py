@@ -9,16 +9,15 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import recall_score, f1_score, roc_auc_score, average_precision_score, confusion_matrix
 from imblearn.over_sampling import SMOTE, RandomOverSampler
 from imblearn.under_sampling import RandomUnderSampler
-
-PROCESSED_DIR = "data/processed"
+from src.project_config import PROCESSED_DIR, RESULTS_DIR, ensure_project_dirs, project_relative
 
 
 def load_processed_data():
     # Recharge les données déjà préparées par le pipeline de preprocessing
-    X_train = pd.read_csv(f"{PROCESSED_DIR}/X_train.csv")
-    X_test = pd.read_csv(f"{PROCESSED_DIR}/X_test.csv")
-    y_train = pd.read_csv(f"{PROCESSED_DIR}/y_train.csv").squeeze()
-    y_test = pd.read_csv(f"{PROCESSED_DIR}/y_test.csv").squeeze()
+    X_train = pd.read_csv(PROCESSED_DIR / "X_train.csv")
+    X_test = pd.read_csv(PROCESSED_DIR / "X_test.csv")
+    y_train = pd.read_csv(PROCESSED_DIR / "y_train.csv").squeeze()
+    y_test = pd.read_csv(PROCESSED_DIR / "y_test.csv").squeeze()
     return X_train, X_test, y_train, y_test
 
 
@@ -40,6 +39,7 @@ def evaluate(model, X_test, y_test):
 def run_rebalancing_comparison():
     # entraîne la même régression logistique avec différentes stratégies de
     # rééquilibrage, et compare les résultats dans un tableau récapitulatif
+    ensure_project_dirs()
     X_train, X_test, y_train, y_test = load_processed_data()
 
     results = []
@@ -98,6 +98,8 @@ def run_rebalancing_comparison():
     print(df_results.to_string(index=False))
     print(f"\nRappel : sur le test (4809 lignes), il y a 712 vraies pannes au total.")
     print("FN = pannes manquées (le plus coûteux en contexte industriel) | FP = fausses alertes")
+    df_results.to_csv(RESULTS_DIR / "rebalancing_comparison.csv", index=False)
+    print(f"Résultats sauvegardés : {project_relative(RESULTS_DIR / 'rebalancing_comparison.csv')}")
 
     return df_results
 

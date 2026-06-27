@@ -1,4 +1,3 @@
-import os
 import joblib
 import pandas as pd
 from sklearn.model_selection import train_test_split
@@ -6,11 +5,13 @@ from sklearn.pipeline import Pipeline
 from sklearn.compose import ColumnTransformer
 from sklearn.impute import SimpleImputer
 from sklearn.preprocessing import StandardScaler, OneHotEncoder
-
-# Chemins
-RAW_DATA_PATH = "data/raw/predictive_maintenance_v3.csv"
-PROCESSED_DIR = "data/processed"
-MODELS_DIR = "outputs/models"
+from src.project_config import (
+    MODELS_DIR,
+    PROCESSED_DIR,
+    ensure_project_dirs,
+    project_relative,
+    resolve_raw_data_path,
+)
 
 # Variables gardées (voir 01_eda.ipynb).
 # Exclues : timestamp/machine_id (identifiants bruts) ;
@@ -29,9 +30,11 @@ NUMERIC_FEATURES = [
 CATEGORICAL_FEATURES = ["machine_type", "operating_mode"]
 
 
-def load_data(path: str = RAW_DATA_PATH) -> pd.DataFrame:
+def load_data(path=None) -> pd.DataFrame:
     # Charge le CSV brut
+    path = path or resolve_raw_data_path()
     df = pd.read_csv(path)
+    print(f"[load_data] Source : {project_relative(path)}")
     print(f"[load_data] Shape brute : {df.shape}")
     return df
 
@@ -84,8 +87,7 @@ def split_data(X: pd.DataFrame, y: pd.Series, test_size: float = 0.2, random_sta
 
 def run_preprocessing():
     # fonction principale 
-    os.makedirs(PROCESSED_DIR, exist_ok=True)
-    os.makedirs(MODELS_DIR, exist_ok=True)
+    ensure_project_dirs()
 
     df = load_data()
     X, y = select_features(df)
@@ -107,17 +109,17 @@ def run_preprocessing():
     X_train_df = pd.DataFrame(X_train_processed, columns=feature_names)
     X_test_df = pd.DataFrame(X_test_processed, columns=feature_names)
 
-    X_train_df.to_csv(f"{PROCESSED_DIR}/X_train.csv", index=False)
-    X_test_df.to_csv(f"{PROCESSED_DIR}/X_test.csv", index=False)
-    y_train.to_csv(f"{PROCESSED_DIR}/y_train.csv", index=False)
-    y_test.to_csv(f"{PROCESSED_DIR}/y_test.csv", index=False)
+    X_train_df.to_csv(PROCESSED_DIR / "X_train.csv", index=False)
+    X_test_df.to_csv(PROCESSED_DIR / "X_test.csv", index=False)
+    y_train.to_csv(PROCESSED_DIR / "y_train.csv", index=False)
+    y_test.to_csv(PROCESSED_DIR / "y_test.csv", index=False)
 
     # On sauvegarde aussi le préprocesseur déjà entraîné (pas juste les données)
     # il sera réutilisé plus tard pour transformer une nouvelle donnée saisie
     # dans le dashboard ou reçue par l'API, exactement de la même façon.
-    joblib.dump(preprocessor, f"{MODELS_DIR}/preprocessor.pkl")
+    joblib.dump(preprocessor, MODELS_DIR / "preprocessor.pkl")
 
-    print(f"[run_preprocessing] Fichiers sauvegardés dans {PROCESSED_DIR}/ et {MODELS_DIR}/")
+    print(f"[run_preprocessing] Fichiers sauvegardés dans {project_relative(PROCESSED_DIR)}/ et {project_relative(MODELS_DIR)}/")
     return X_train_df, X_test_df, y_train, y_test
 
 

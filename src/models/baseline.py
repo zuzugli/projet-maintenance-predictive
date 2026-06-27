@@ -9,16 +9,15 @@ from sklearn.metrics import (
     accuracy_score, recall_score, f1_score, roc_auc_score,
     average_precision_score, confusion_matrix, classification_report
 )
-
-PROCESSED_DIR = "data/processed"
+from src.project_config import PROCESSED_DIR, RESULTS_DIR, ensure_project_dirs, project_relative
 
 
 def load_processed_data():
     # Recharge les données déjà préparées par le pipeline de preprocessing
-    X_train = pd.read_csv(f"{PROCESSED_DIR}/X_train.csv")
-    X_test = pd.read_csv(f"{PROCESSED_DIR}/X_test.csv")
-    y_train = pd.read_csv(f"{PROCESSED_DIR}/y_train.csv").squeeze()
-    y_test = pd.read_csv(f"{PROCESSED_DIR}/y_test.csv").squeeze()
+    X_train = pd.read_csv(PROCESSED_DIR / "X_train.csv")
+    X_test = pd.read_csv(PROCESSED_DIR / "X_test.csv")
+    y_train = pd.read_csv(PROCESSED_DIR / "y_train.csv").squeeze()
+    y_test = pd.read_csv(PROCESSED_DIR / "y_test.csv").squeeze()
     return X_train, X_test, y_train, y_test
 
 
@@ -54,6 +53,7 @@ def evaluate_model(model, X_test, y_test, model_name="Modèle"):
 
 def run_baseline():
     # Entraîne la régression logistique baseline et l'évalue
+    ensure_project_dirs()
     X_train, X_test, y_train, y_test = load_processed_data()
 
     # On compare aussi à un "modèle naïf" qui prédit toujours la classe majoritaire
@@ -68,6 +68,8 @@ def run_baseline():
     model.fit(X_train, y_train)
 
     results = evaluate_model(model, X_test, y_test, model_name="Baseline - Régression Logistique (sans rééquilibrage)")
+    pd.DataFrame([results]).round(4).to_csv(RESULTS_DIR / "baseline_results.csv", index=False)
+    print(f"\nRésultats sauvegardés : {project_relative(RESULTS_DIR / 'baseline_results.csv')}")
     return model, results
 
 

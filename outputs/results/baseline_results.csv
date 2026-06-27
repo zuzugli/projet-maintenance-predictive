@@ -1,0 +1,2 @@
+model,accuracy,recall,f1,roc_auc,pr_auc
+Baseline - Régression Logistique (sans rééquilibrage),0.9289,0.6784,0.7385,0.958,0.8405

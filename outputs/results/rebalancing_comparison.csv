@@ -1,0 +1,6 @@
+technique,recall,f1,roc_auc,pr_auc,FN,FP
+Baseline (aucun rééquilibrage),0.6784,0.7385,0.958,0.8405,229,113
+class_weight='balanced',0.8947,0.7468,0.9588,0.8376,75,357
+Random Over-Sampling,0.8919,0.7475,0.9589,0.8385,77,352
+SMOTE,0.8876,0.7484,0.9586,0.8385,80,345
+Random Under-Sampling,0.8862,0.7459,0.9591,0.8384,81,349
