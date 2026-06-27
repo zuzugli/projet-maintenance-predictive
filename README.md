@@ -118,21 +118,21 @@ Les fichiers de résultats sont exportés dans `outputs/results/` :
 
 | Modèle | F1 | Recall | ROC-AUC | Seuil retenu |
 |---|---|---|---|---|
-| Régression Logistique | 0.763 | 0.860 | 0.959 | 0.60 |
-| Random Forest | 0.857 | 0.928 | 0.989 | 0.55 |
-| **Hist Gradient Boosting (retenu)** | **0.848** | **0.926** | **0.986** | **0.65** |
-| MLP (Deep Learning) | 0.785 | 0.920 | 0.974 | 0.70 |
+| Régression Logistique | 0.765 | 0.862 | 0.959 | 0.60 |
+| Random Forest | 0.890 | 0.928 | 0.994 | 0.55 |
+| **Hist Gradient Boosting (retenu)** | **0.908** | **0.944** | **0.996** | **0.60** |
+| MLP (Deep Learning) | 0.817 | 0.903 | 0.981 | 0.70 |
 
-Les seuils de décision sont désormais sélectionnés sur une validation interne du train set, puis évalués sur le test set dans la comparaison finale.
+Les seuils sont sélectionnés sur un split de validation interne du train set, puis évalués une seule fois sur le test set. Les hyperparamètres sont optimisés par RandomizedSearchCV (modèles sklearn) et recherche aléatoire manuelle (MLP).
 
 **Modèle retenu : Hist Gradient Boosting**
-Random Forest obtient le meilleur F1-score, mais Hist Gradient Boosting est retenu comme meilleur compromis : écart faible de performance, modèle environ 40x plus léger (215 Ko vs 8,5 Mo) et environ 13x plus rapide en prédiction (2,28 ms vs 29,57 ms).
+Après optimisation des hyperparamètres, HistGB est le meilleur modèle sur tous les critères : F1 = 0.908 (vs 0.890 pour RF), 40x plus léger (213 Ko vs 8 531 Ko) et 13x plus rapide en prédiction (4.03 ms vs 54.05 ms).
 
 ### Variables les plus importantes
-1. Vitesse de rotation (RPM) - 41%
-2. Température moteur - 26%
-3. Courant électrique - 21%
-4. Vibration (RMS) - 19%
+1. Vitesse de rotation (RPM) - 40%
+2. Température moteur - 31%
+3. Vibration (RMS) - 17%
+4. Courant électrique - 16%
 
 ---
 

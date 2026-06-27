@@ -1,9 +1,8 @@
 # Modélisation : comparaison des 3 modèles ML
 
 # Objectif : entraîner et comparer 3 modèles de machine learning
-# avec une validation croisée Stratified K-Fold
-# On retient class_weight="balanced" pour les 3 modèles : les 3 supportent ce paramètre nativement, donc on peut les
-# traiter de la même façon (même pondération, même validation croisée).
+# avec optimisation des hyperparamètres (RandomizedSearchCV) et
+# validation croisée Stratified K-Fold.
 
 # Modèles comparés :
 # régression logistique (linéaire, très interprétable), Random Forest et Hist Gradient Boosting
@@ -11,7 +10,7 @@ import pandas as pd
 import joblib
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier, HistGradientBoostingClassifier
-from sklearn.model_selection import StratifiedKFold, cross_val_score
+from sklearn.model_selection import StratifiedKFold, cross_val_score, RandomizedSearchCV
 from sklearn.metrics import recall_score, f1_score, roc_auc_score, average_precision_score, confusion_matrix
 import time
 from src.project_config import MODELS_DIR, PROCESSED_DIR, RESULTS_DIR, ensure_project_dirs, project_relative
@@ -42,26 +41,52 @@ def evaluate(model, X_test, y_test):
 
 
 def cross_validate_model(model, X_train, y_train):
-    # validation croisée Stratified K-Fold (5 folds) : à chaque découpage, la
-    # proportion de pannes (14.8%) est préservée dans chaque fold, contrairement
-    # à un K-Fold classique qui pourrait créer des folds très différents les uns
-    # des autres sur un dataset déséquilibré
+    # Validation croisée Stratified K-Fold (5 folds) : la proportion de pannes
+    # est préservée dans chaque fold, essentiel sur un dataset déséquilibré.
     skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
     scores = cross_val_score(model, X_train, y_train, cv=skf, scoring="f1")
     return scores.mean(), scores.std()
 
 
+def tune_model(estimator, param_distributions, X_train, y_train, n_iter=20):
+    # RandomizedSearchCV : explore n_iter combinaisons aléatoires dans l'espace
+    # des hyperparamètres. Plus rapide que GridSearchCV pour les grands espaces,
+    # avec des résultats comparables. Scoring = f1 car dataset déséquilibré.
+    skf = StratifiedKFold(n_splits=3, shuffle=True, random_state=42)
+    search = RandomizedSearchCV(
+        estimator,
+        param_distributions,
+        n_iter=n_iter,
+        scoring="f1",
+        cv=skf,
+        random_state=42,
+        n_jobs=-1,
+        verbose=0,
+    )
+    search.fit(X_train, y_train)
+    print(f"    Meilleurs params : {search.best_params_}  |  F1 CV : {search.best_score_:.4f}")
+    return search.best_estimator_
+
+
 def run_ml_comparison():
-    # entraîne et compare les 3 modèles ML, tous avec class_weight='balanced'
+    # Entraîne et compare les 3 modèles ML avec optimisation des hyperparamètres
     ensure_project_dirs()
     X_train, X_test, y_train, y_test = load_processed_data()
 
     results = []
 
     # 1. Régression logistique
-    print("[1/3] Régression logistique...")
+    print("[1/3] Régression logistique - optimisation des hyperparamètres...")
     t0 = time.time()
-    model_lr = LogisticRegression(max_iter=1000, random_state=42, class_weight="balanced")
+    lr_params = {
+        "C": [0.01, 0.1, 1, 10, 100],
+        "solver": ["lbfgs", "liblinear"],
+        "max_iter": [500, 1000, 2000],
+    }
+    model_lr = tune_model(
+        LogisticRegression(random_state=42, class_weight="balanced"),
+        lr_params, X_train, y_train,
+    )
     cv_mean, cv_std = cross_validate_model(model_lr, X_train, y_train)
     model_lr.fit(X_train, y_train)
     train_time = time.time() - t0
@@ -70,9 +95,18 @@ def run_ml_comparison():
     results.append(res)
 
     # 2. Random Forest
-    print("[2/3] Random Forest...")
+    print("[2/3] Random Forest - optimisation des hyperparamètres...")
     t0 = time.time()
-    model_rf = RandomForestClassifier(n_estimators=200, max_depth=10, random_state=42, class_weight="balanced", n_jobs=-1)
+    rf_params = {
+        "n_estimators": [100, 200, 300],
+        "max_depth": [5, 10, 15, None],
+        "min_samples_split": [2, 5, 10],
+        "min_samples_leaf": [1, 2, 4],
+    }
+    model_rf = tune_model(
+        RandomForestClassifier(random_state=42, class_weight="balanced", n_jobs=-1),
+        rf_params, X_train, y_train,
+    )
     cv_mean, cv_std = cross_validate_model(model_rf, X_train, y_train)
     model_rf.fit(X_train, y_train)
     train_time = time.time() - t0
@@ -80,12 +114,19 @@ def run_ml_comparison():
     res.update({"model": "Random Forest", "cv_f1_mean": cv_mean, "cv_f1_std": cv_std, "train_time_s": train_time})
     results.append(res)
 
-    # 3. Hist Gradient Boosting (supporte nativement class_weight, contrairement
-    # à GradientBoostingClassifier classique)
-    print("[3/3] Hist Gradient Boosting...")
+    # 3. Hist Gradient Boosting
+    print("[3/3] Hist Gradient Boosting - optimisation des hyperparamètres...")
     t0 = time.time()
-    model_gb = HistGradientBoostingClassifier(max_iter=200, max_depth=3, learning_rate=0.1,
-                                                random_state=42, class_weight="balanced")
+    gb_params = {
+        "max_iter": [100, 200, 300],
+        "max_depth": [3, 5, 7],
+        "learning_rate": [0.05, 0.1, 0.2],
+        "min_samples_leaf": [20, 50, 100],
+    }
+    model_gb = tune_model(
+        HistGradientBoostingClassifier(random_state=42, class_weight="balanced"),
+        gb_params, X_train, y_train,
+    )
     cv_mean, cv_std = cross_validate_model(model_gb, X_train, y_train)
     model_gb.fit(X_train, y_train)
     train_time = time.time() - t0

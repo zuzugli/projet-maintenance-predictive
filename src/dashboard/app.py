@@ -61,6 +61,17 @@ SENSOR_HELP = {
 }
 
 
+@st.cache_data
+def load_histgb_threshold():
+    metrics_path = RESULTS_DIR / "final_test_metrics.csv"
+    if metrics_path.exists():
+        df = pd.read_csv(metrics_path)
+        row = df[df["model"] == "Hist Gradient Boosting"]
+        if not row.empty:
+            return float(row["seuil_retenu"].values[0])
+    return 0.60
+
+
 @st.cache_resource
 def load_artifacts():
     preprocessor = joblib.load(MODELS_DIR / "preprocessor.pkl")
@@ -187,6 +198,8 @@ def build_input_features(vibration, temperature, current, pressure, rpm,
 
 
 def main():
+    threshold = load_histgb_threshold()
+
     try:
         preprocessor, model = load_artifacts()
     except FileNotFoundError as exc:
@@ -248,7 +261,7 @@ def main():
             col_a, col_b = st.columns([1, 2])
             with col_a:
                 st.metric("Probabilité de panne dans les 24h", f"{proba*100:.1f}%")
-                if proba >= 0.75:
+                if proba >= threshold:
                     st.error("⚠️ Risque élevé - intervention recommandée")
                 elif proba >= 0.40:
                     st.warning("🟡 Risque modéré - surveillance conseillée")
@@ -261,22 +274,21 @@ def main():
                     title={"text": "Risque de panne (%)"},
                     gauge={
                         "axis": {"range": [0, 100]},
-                        "bar": {"color": "darkred" if proba >= 0.75 else ("orange" if proba >= 0.4 else "green")},
+                        "bar": {"color": "darkred" if proba >= threshold else ("orange" if proba >= 0.4 else "green")},
                         "steps": [
                             {"range": [0, 40], "color": "#d4edda"},
-                            {"range": [40, 75], "color": "#fff3cd"},
-                            {"range": [75, 100], "color": "#f8d7da"},
+                            {"range": [40, threshold * 100], "color": "#fff3cd"},
+                            {"range": [threshold * 100, 100], "color": "#f8d7da"},
                         ],
                     },
                 ))
                 fig.update_layout(height=250, margin=dict(l=20, r=20, t=40, b=20))
                 st.plotly_chart(fig, use_container_width=True)
 
-            # Seuil retenu : 0.75 pour Hist Gradient Boosting (meilleur F1)
-            if proba >= 0.75:
-                st.warning("Le seuil de décision retenu (0.75) classe ce scénario comme **à risque de panne**.")
+            if proba >= threshold:
+                st.warning(f"Le seuil de décision retenu ({threshold}) classe ce scénario comme **à risque de panne**.")
             else:
-                st.success("Le seuil de décision retenu (0.75) classe ce scénario comme **sans risque immédiat**.")
+                st.success(f"Le seuil de décision retenu ({threshold}) classe ce scénario comme **sans risque immédiat**.")
 
     # ============================================================
     # ONGLET 2 : COMPARAISON DES MODÈLES + ÉCORESPONSABILITÉ
@@ -371,9 +383,22 @@ def main():
         )
 
         k1, k2, k3 = st.columns(3)
-        k1.metric("Taille HistGB (retenu)", "213 Ko", delta="-97.5 % vs Random Forest", delta_color="normal")
-        k2.metric("Temps prédiction HistGB", "2.12 ms", delta="-85 % vs Random Forest", delta_color="normal")
-        k3.metric("Taille Random Forest", "8 531 Ko", help="40× plus lourd que HistGB")
+        histgb_row = df_comp[df_comp["Modèle"].str.contains("Hist Gradient")]
+        rf_row = df_comp[df_comp["Modèle"] == "Random Forest"]
+        if not histgb_row.empty and not rf_row.empty:
+            gb_size = histgb_row["Taille fichier (Ko)"].values[0]
+            gb_time = histgb_row["Temps prédiction (ms)"].values[0]
+            rf_size = rf_row["Taille fichier (Ko)"].values[0]
+            rf_time = rf_row["Temps prédiction (ms)"].values[0]
+            size_pct = (1 - gb_size / rf_size) * 100
+            time_pct = (1 - gb_time / rf_time) * 100
+            k1.metric("Taille HistGB (retenu)", f"{gb_size:.0f} Ko", delta=f"-{size_pct:.0f} % vs Random Forest", delta_color="normal")
+            k2.metric("Temps prédiction HistGB", f"{gb_time:.2f} ms", delta=f"-{time_pct:.0f} % vs Random Forest", delta_color="normal")
+            k3.metric("Taille Random Forest", f"{rf_size:.0f} Ko", help=f"{rf_size/gb_size:.0f}x plus lourd que HistGB")
+        else:
+            k1.metric("Taille HistGB (retenu)", "213 Ko", delta="-97.5 % vs Random Forest", delta_color="normal")
+            k2.metric("Temps prédiction HistGB", "2.12 ms", delta="-85 % vs Random Forest", delta_color="normal")
+            k3.metric("Taille Random Forest", "8 531 Ko", help="40x plus lourd que HistGB")
 
         fig_eco = px.bar(
             df_comp.dropna(subset=["Temps prédiction (ms)"]),
@@ -383,26 +408,53 @@ def main():
         )
         st.plotly_chart(fig_eco, use_container_width=True)
 
-        st.info(
-            "**Conclusion écoresponsabilité :** le modèle **Hist Gradient Boosting** est le plus vertueux - "
-            "il offre les meilleures performances opérationnelles tout en minimisant la taille du modèle "
-            "(213 Ko contre 8,5 Mo pour le Random Forest) et le temps de prédiction (2,12 ms). "
-            "En déploiement industriel, cela se traduit par une consommation énergétique réduite "
-            "pour chaque inférence et des besoins d'infrastructure moindres. "
-            "Le MLP (Deep Learning) présente un coût d'entraînement plus élevé "
-            "sans apporter un gain de performance suffisant pour le justifier sur ce jeu de données."
-        )
+        if not histgb_row.empty and not rf_row.empty:
+            eco_txt = (
+                f"**Conclusion écoresponsabilité :** le modèle **Hist Gradient Boosting** est le plus vertueux - "
+                f"il offre les meilleures performances opérationnelles tout en minimisant la taille du modèle "
+                f"({gb_size:.0f} Ko contre {rf_size/1024:.1f} Mo pour le Random Forest) "
+                f"et le temps de prédiction ({gb_time:.2f} ms contre {rf_time:.2f} ms). "
+                f"En déploiement industriel, cela se traduit par une consommation énergétique réduite "
+                f"pour chaque inférence et des besoins d'infrastructure moindres. "
+                f"Le MLP (Deep Learning) présente un coût d'entraînement plus élevé "
+                f"sans apporter un gain de performance suffisant pour le justifier sur ce jeu de données."
+            )
+        else:
+            eco_txt = (
+                "**Conclusion écoresponsabilité :** le modèle **Hist Gradient Boosting** est le plus vertueux - "
+                "il offre les meilleures performances opérationnelles tout en minimisant la taille du modèle "
+                "et le temps de prédiction. En déploiement industriel, cela se traduit par une consommation "
+                "énergétique réduite pour chaque inférence et des besoins d'infrastructure moindres. "
+                "Le MLP (Deep Learning) présente un coût d'entraînement plus élevé "
+                "sans apporter un gain de performance suffisant pour le justifier sur ce jeu de données."
+            )
+        st.info(eco_txt)
 
         # --- Conclusion ---
         st.divider()
         st.subheader("Modèle retenu")
-        st.success(
-            "**Hist Gradient Boosting** a été sélectionné comme modèle final. "
-            "Il offre des performances quasi identiques au Random Forest (F1 = 0.862 vs 0.863) "
-            "tout en étant 40x plus léger (213 Ko vs 8,5 Mo) et 7x plus rapide en prédiction (2,12 ms vs 14,39 ms). "
-            "Sa stabilité en validation croisée, sa facilité de déploiement et son interprétabilité native "
-            "en font le meilleur compromis pour un usage industriel."
-        )
+        if not histgb_row.empty and not rf_row.empty:
+            gb_f1 = histgb_row["F1-score"].values[0]
+            rf_f1 = rf_row["F1-score"].values[0]
+            size_ratio = rf_size / gb_size
+            time_ratio = rf_time / gb_time
+            conclusion = (
+                f"**Hist Gradient Boosting** a été sélectionné comme modèle final. "
+                f"Il surpasse le Random Forest en F1 ({gb_f1:.3f} vs {rf_f1:.3f}) "
+                f"tout en étant {size_ratio:.0f}x plus léger ({gb_size:.0f} Ko vs {rf_size:.0f} Ko) "
+                f"et {time_ratio:.0f}x plus rapide en prédiction ({gb_time:.2f} ms vs {rf_time:.2f} ms). "
+                f"Sa stabilité en validation croisée, sa facilité de déploiement et son interprétabilité native "
+                f"en font le meilleur compromis pour un usage industriel."
+            )
+        else:
+            conclusion = (
+                "**Hist Gradient Boosting** a été sélectionné comme modèle final. "
+                "Meilleur compromis performance, légèreté (213 Ko vs 8,5 Mo pour le Random Forest) "
+                "et vitesse de prédiction (2,12 ms vs 14,39 ms). "
+                "Sa stabilité en validation croisée, sa facilité de déploiement et son interprétabilité native "
+                "en font le meilleur compromis pour un usage industriel."
+            )
+        st.success(conclusion)
 
     # ============================================================
     # ONGLET 3 : IMPORTANCE DES VARIABLES + SHAP

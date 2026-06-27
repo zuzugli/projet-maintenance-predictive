@@ -26,7 +26,7 @@ Le dataset utilisé provient de Kaggle : [Industrial Machine Predictive Maintena
 
 La démarche suivie couvre l'ensemble d'un pipeline Data Science : analyse exploratoire, préparation des données, gestion des valeurs manquantes, encodage, standardisation, entraînement de plusieurs modèles, comparaison quantitative, interprétabilité et intégration dans un dashboard Streamlit. Quatre modèles principaux sont comparés : régression logistique, Random Forest, Hist Gradient Boosting et MLP Deep Learning.
 
-Le modèle final retenu est le **Hist Gradient Boosting**, car il offre le meilleur compromis opérationnel entre performance, rapidité de prédiction, taille du modèle et facilité de déploiement. Sur l'évaluation finale, après sélection du seuil sur validation interne, il obtient un F1-score de 0,8481, un recall de 0,9256 et un ROC-AUC de 0,9861. Le Random Forest obtient un F1-score légèrement supérieur (0,8573) et un recall légèrement supérieur (0,9284), mais il est beaucoup plus lourd et plus lent en inférence.
+Le modèle final retenu est le **Hist Gradient Boosting**, car il offre le meilleur compromis opérationnel entre performance, rapidité de prédiction, taille du modèle et facilité de déploiement. Les hyperparamètres des modèles sklearn ont été optimisés par RandomizedSearchCV (scoring F1, StratifiedKFold à 3 folds, 20 itérations) et ceux du MLP par recherche aléatoire manuelle (10 combinaisons sur un split de validation interne). Sur l'évaluation finale, après sélection du seuil sur validation interne, Hist Gradient Boosting obtient un F1-score de 0,908, un recall de 0,944 et un ROC-AUC de 0,996 - le meilleur résultat de tous les modèles testés.
 
 L'outil final proposé est un dashboard décisionnel Streamlit permettant de simuler un scénario machine, obtenir une probabilité de panne, comparer les modèles, consulter les matrices de confusion, visualiser les variables influentes et explorer les données. Une API REST n'a pas été implémentée, car elle est optionnelle dans le cahier des charges, mais elle constitue une piste d'industrialisation naturelle.
 
@@ -274,7 +274,9 @@ Le projet est organisé pour séparer les responsabilités :
 3. **Hist Gradient Boosting** : modèle performant, compact et rapide.
 4. **MLP Deep Learning** : réseau neuronal dense à deux couches cachées.
 
-Le MLP contient deux couches cachées de 32 et 16 neurones avec activation ReLU, dropout et sortie sigmoid. Un early stopping limite le surapprentissage.
+Les hyperparamètres des modèles sklearn (régression logistique, Random Forest, Hist Gradient Boosting) ont été optimisés par **RandomizedSearchCV** : 20 itérations aléatoires dans l'espace de recherche, scoring F1, validation croisée StratifiedKFold à 3 folds. Pour le MLP, incompatible avec RandomizedSearchCV, une **recherche aléatoire manuelle** a été implémentée : 10 combinaisons testées sur un split de validation interne (80/20 du train set), la meilleure retenue pour l'entraînement final sur le train complet.
+
+Le MLP retenu contient deux couches cachées de 32 et 16 neurones avec activation ReLU, dropout à 0,1 et sortie sigmoid. Un early stopping (patience=10) limite le surapprentissage.
 
 ---
 
@@ -292,14 +294,14 @@ Les résultats finaux générés dans `outputs/results/final_test_metrics.csv` s
 
 | Modèle | Seuil | Precision | Recall | F1 | ROC-AUC | PR-AUC | FN | FP |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|
-| Régression Logistique | 0,60 | 0,6861 | 0,8596 | 0,7631 | 0,9588 | 0,8376 | 100 | 280 |
-| Random Forest | 0,55 | 0,7964 | 0,9284 | 0,8573 | 0,9886 | 0,9394 | 51 | 169 |
-| Hist Gradient Boosting | 0,65 | 0,7827 | 0,9256 | 0,8481 | 0,9861 | 0,9280 | 53 | 183 |
-| MLP Deep Learning | 0,70 | 0,6851 | 0,9199 | 0,7854 | 0,9741 | 0,8695 | 57 | 301 |
+| Régression Logistique | 0,60 | 0,6868 | 0,8624 | 0,7646 | 0,9589 | 0,8379 | 98 | 280 |
+| Random Forest | 0,55 | 0,8551 | 0,9284 | 0,8902 | 0,9937 | 0,9656 | 51 | 112 |
+| **Hist Gradient Boosting** | **0,60** | **0,8739** | **0,9438** | **0,9075** | **0,9960** | **0,9794** | **40** | **97** |
+| MLP Deep Learning | 0,70 | 0,7459 | 0,9031 | 0,8170 | 0,9813 | 0,8976 | 69 | 219 |
 
-Le Random Forest obtient le meilleur F1-score (0,8573 contre 0,8481 pour Hist Gradient Boosting) et le meilleur recall (0,9284 contre 0,9256). Il manque donc deux pannes de moins sur le test set (51 FN contre 53 FN pour Hist Gradient Boosting) et produit moins de fausses alertes (169 FP contre 183 FP). Sur la performance pure, Random Forest est donc légèrement devant.
+Après optimisation des hyperparamètres par RandomizedSearchCV, **Hist Gradient Boosting est le meilleur modèle sur tous les critères** : F1 = 0,908 contre 0,890 pour Random Forest, recall = 0,944 contre 0,928, et seulement 40 FN contre 51 pour Random Forest. L'optimisation a permis un gain de +0,059 point de F1 pour HistGB et +0,033 pour RF par rapport aux hyperparamètres initiaux.
 
-Le choix final reste cependant **Hist Gradient Boosting** pour une logique de compromis industriel. L'écart de performance est faible : 0,0092 point de F1 et 0,0028 point de recall. En contrepartie, Hist Gradient Boosting est nettement plus léger et plus rapide : 215 Ko contre 8 517 Ko pour Random Forest, et environ 2,28 ms contre 29,57 ms par prédiction. Le Random Forest est donc environ 40 fois plus lourd et 13 fois plus lent en inférence. Dans un usage de dashboard ou de service de prédiction appelé fréquemment, ce coût opérationnel compte : Hist Gradient Boosting offre une performance presque équivalente avec un déploiement plus simple, une latence plus faible et une empreinte computationnelle plus cohérente avec l'objectif d'écoresponsabilité.
+Le choix de **Hist Gradient Boosting** comme modèle final est donc renforcé par le tuning : il surpasse Random Forest sur les métriques de performance tout en étant nettement plus léger et plus rapide. Hist Gradient Boosting pèse 213 Ko contre 8 531 Ko pour Random Forest, et prédit en 4,03 ms contre 54,05 ms. Dans un usage de dashboard ou de service de prédiction appelé fréquemment, ce triple avantage - meilleure performance, déploiement plus simple et empreinte computationnelle réduite - en fait le choix optimal.
 
 Le tuning du seuil est désormais réalisé sur une validation interne du train set, puis appliqué au test set. Cette correction évite de choisir le seuil en regardant directement la performance finale du test.
 
@@ -316,11 +318,11 @@ L'interprétabilité est réalisée avec deux approches :
 
 Les variables les plus influentes sont :
 
-1. vitesse de rotation (`rpm`) ;
-2. température moteur ;
-3. courant électrique ;
-4. vibration ;
-5. pression.
+1. vitesse de rotation (`rpm`) - 40% ;
+2. température moteur - 31% ;
+3. vibration (RMS) - 17% ;
+4. courant électrique - 16% ;
+5. pression - 6%.
 
 Cette hiérarchie est cohérente avec le domaine industriel : une machine soumise à des régimes élevés, une température anormale, une consommation électrique élevée et des vibrations importantes présente un risque plus élevé.
 
@@ -448,7 +450,7 @@ Le pipeline est traçable : dataset brut, preprocessing, modèles, seuils et mé
 - Une seule tâche prédictive traitée, alors que le dataset permettrait aussi la régression du RUL ou la classification du type de panne.
 - API REST non implémentée.
 - Dashboard local, sans déploiement cloud.
-- Hyperparamètres optimisés de manière raisonnable mais non exhaustive.
+- Hyperparamètres optimisés par RandomizedSearchCV (sklearn) et recherche aléatoire manuelle (MLP) - exploration partielle de l'espace, non exhaustive.
 
 ### Améliorations possibles
 
@@ -457,8 +459,7 @@ Le pipeline est traçable : dataset brut, preprocessing, modèles, seuils et mé
 3. Ajouter un monitoring de drift et de performance.
 4. Tester des modèles temporels si l'ordre chronologique est exploitable.
 5. Ajouter une tâche secondaire : estimation du `rul_hours` ou classification `failure_type`.
-6. Optimiser les hyperparamètres avec `RandomizedSearchCV` ou Optuna.
-7. Ajouter des tests automatisés sur le chargement des artefacts et une prédiction type.
+6. Ajouter des tests automatisés sur le chargement des artefacts et une prédiction type.
 8. Produire des captures d'écran définitives du dashboard pour la soutenance.
 
 ---
@@ -467,7 +468,7 @@ Le pipeline est traçable : dataset brut, preprocessing, modèles, seuils et mé
 
 Ce projet démontre une démarche Data Science complète appliquée à la maintenance prédictive industrielle. A partir d'un dataset brut Kaggle, la solution réalise une analyse exploratoire, prépare les données, entraîne plusieurs modèles, compare leurs performances, interprète les prédictions et propose un dashboard décisionnel.
 
-Le modèle final retenu est le Hist Gradient Boosting, car il représente le meilleur compromis entre performance, stabilité, coût de calcul, taille du modèle et facilité d'intégration. Même si Random Forest obtient le meilleur F1-score, son gain reste limité au regard de son coût d'inférence et de sa taille de sérialisation. Le projet montre également que le Deep Learning n'est pas systématiquement supérieur : le MLP obtient des résultats corrects, mais n'apporte pas de gain suffisant par rapport aux modèles d'arbres.
+Le modèle final retenu est le Hist Gradient Boosting, car il représente le meilleur compromis entre performance, stabilité, coût de calcul, taille du modèle et facilité d'intégration. Après optimisation des hyperparamètres par RandomizedSearchCV, il obtient le meilleur F1-score (0,908) et le meilleur recall (0,944) tout en étant 40 fois plus léger et 13 fois plus rapide que le Random Forest. Le projet montre également que le Deep Learning n'est pas systématiquement supérieur : le MLP obtient des résultats corrects, mais n'apporte pas de gain suffisant par rapport aux modèles d'arbres.
 
 La valeur métier de la solution réside dans sa capacité à transformer des signaux capteurs en information actionnable : probabilité de panne, niveau de risque, variables explicatives et comparaison des modèles. La solution reste perfectible, notamment sur l'API, le déploiement et le monitoring, mais elle constitue un MVP solide et explicable.
 
