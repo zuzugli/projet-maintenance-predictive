@@ -318,9 +318,9 @@ Les FN sont les erreurs les plus coûteuses dans un contexte industriel : une pa
 | Modèle | FN | Taux manqué |
 |---|---:|---:|
 | Régression Logistique | 98 | 13,8 % |
-| MLP Deep Learning | 82 | 11,5 % |
-| Random Forest | 51 | 7,2 % |
-| **Hist Gradient Boosting** | **47** | **6,6 %** |
+| MLP Deep Learning | 71 | 10,0 % |
+| Random Forest | 63 | 8,9 % |
+| **Hist Gradient Boosting** | **43** | **6,0 %** |
 
 HistGB manque 43 pannes sur 712, soit 6,0 % des défaillances réelles. Ces cas correspondent vraisemblablement à des machines dont les capteurs présentent des valeurs proches des seuils de séparation : un profil globalement normal avec un seul indicateur légèrement dégradé, insuffisant pour déclencher l'alerte. Le dataset étant simulé, ces cas limites peuvent aussi refléter du bruit dans la génération des données plutôt qu'une ambiguïté physique réelle.
 
@@ -331,8 +331,8 @@ Les FP génèrent des interventions inutiles et, à terme, une "fatigue d'alerte
 | Modèle | FP | Taux fausse alerte |
 |---|---:|---:|
 | Régression Logistique | 280 | 6,8 % |
-| MLP Deep Learning | 194 | 4,7 % |
-| Random Forest | 112 | 2,7 % |
+| MLP Deep Learning | 228 | 5,6 % |
+| Random Forest | 84 | 2,1 % |
 | **Hist Gradient Boosting** | **79** | **1,9 %** |
 
 HistGB déclenche 79 fausses alertes sur 4 097 machines saines (1,9 %). Ces erreurs correspondent probablement à des machines fonctionnant temporairement en mode "peak" avec des vibrations ou une température élevée, sans qu'une panne soit imminente : le signal capteur est anormal mais sans conséquence réelle.
