@@ -10,3 +10,4 @@ outputs/models/*.h5
 .DS_Store
 *.env
 .claude/
+reports/

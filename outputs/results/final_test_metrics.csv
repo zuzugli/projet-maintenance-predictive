@@ -1,5 +1,5 @@
-model,seuil_retenu,precision,recall,f1,roc_auc,pr_auc,FN,FP
-Régression Logistique,0.6,0.6868,0.8624,0.7646,0.9589,0.8379,98,280
-Random Forest,0.55,0.8551,0.9284,0.8902,0.9937,0.9656,51,112
-Hist Gradient Boosting,0.7,0.8938,0.934,0.9135,0.996,0.9794,47,79
-MLP (Deep Learning),0.75,0.7646,0.8848,0.8203,0.9813,0.8976,82,194
+model                 , seuil_retenu, precision, recall, f1    , roc_auc, pr_auc, FN, FP
+Régression Logistique ,         0.6 ,    0.6868, 0.8624, 0.7646,  0.9589, 0.8379, 98, 280
+Random Forest         ,         0.55,    0.8551, 0.9284, 0.8902,  0.9937, 0.9656, 51, 112
+Hist Gradient Boosting,         0.7 ,    0.8938, 0.934 , 0.9135,  0.996 , 0.9794, 47,  79
+MLP (Deep Learning)   ,         0.75,    0.7646, 0.8848, 0.8203,  0.9813, 0.8976, 82, 194

@@ -1,4 +1,4 @@
-model,recall,f1,roc_auc,pr_auc,FN,FP,cv_f1_mean,cv_f1_std,train_time_s
-Régression Logistique,0.8961,0.7475,0.9589,0.8379,74,357,0.7459,0.0106,0.0289
-Random Forest,0.9452,0.8879,0.9937,0.9656,39,131,0.8927,0.0099,1.463
-Hist Gradient Boosting,0.9607,0.9,0.996,0.9794,28,124,0.8953,0.0073,1.4472
+model                 , recall, f1    , roc_auc, pr_auc, FN, FP , cv_f1_mean, cv_f1_std, train_time_s
+Régression Logistique , 0.8961, 0.7475,  0.9589, 0.8379, 74, 357,     0.7459,    0.0106,       0.0289
+Random Forest         , 0.9452, 0.8879,  0.9937, 0.9656, 39, 131,     0.8927,    0.0099,       1.463
+Hist Gradient Boosting, 0.9607, 0.9   ,  0.996 , 0.9794, 28, 124,     0.8953,    0.0073,       1.4472
