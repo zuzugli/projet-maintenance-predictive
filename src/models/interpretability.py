@@ -68,7 +68,7 @@ def run_shap_analysis(model, X_test):
     # prédiction finale. On utilise ici un échantillon du test (100 lignes)
     # plutôt que tout le test set, car le calcul SHAP est coûteux
     X_sample = X_test.sample(n=100, random_state=42)
-    explainer = shap.TreeExplainer(model, X_sample)
+    explainer = shap.TreeExplainer(model)
     shap_values = explainer(X_sample, check_additivity=False)
 
     # Graphique global : importance moyenne (en valeur absolue) de chaque variable

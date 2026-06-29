@@ -77,7 +77,6 @@ def run_ml_comparison():
 
     # 1. Régression logistique
     print("[1/3] Régression logistique - optimisation des hyperparamètres...")
-    t0 = time.time()
     lr_params = {
         "C": [0.01, 0.1, 1, 10, 100],
         "solver": ["lbfgs", "liblinear"],
@@ -88,6 +87,7 @@ def run_ml_comparison():
         lr_params, X_train, y_train,
     )
     cv_mean, cv_std = cross_validate_model(model_lr, X_train, y_train)
+    t0 = time.time()
     model_lr.fit(X_train, y_train)
     train_time = time.time() - t0
     res = evaluate(model_lr, X_test, y_test)
@@ -96,7 +96,6 @@ def run_ml_comparison():
 
     # 2. Random Forest
     print("[2/3] Random Forest - optimisation des hyperparamètres...")
-    t0 = time.time()
     rf_params = {
         "n_estimators": [100, 200, 300],
         "max_depth": [5, 10, 15, None],
@@ -108,6 +107,7 @@ def run_ml_comparison():
         rf_params, X_train, y_train,
     )
     cv_mean, cv_std = cross_validate_model(model_rf, X_train, y_train)
+    t0 = time.time()
     model_rf.fit(X_train, y_train)
     train_time = time.time() - t0
     res = evaluate(model_rf, X_test, y_test)
@@ -116,7 +116,6 @@ def run_ml_comparison():
 
     # 3. Hist Gradient Boosting
     print("[3/3] Hist Gradient Boosting - optimisation des hyperparamètres...")
-    t0 = time.time()
     gb_params = {
         "max_iter": [100, 200, 300],
         "max_depth": [3, 5, 7],
@@ -128,6 +127,7 @@ def run_ml_comparison():
         gb_params, X_train, y_train,
     )
     cv_mean, cv_std = cross_validate_model(model_gb, X_train, y_train)
+    t0 = time.time()
     model_gb.fit(X_train, y_train)
     train_time = time.time() - t0
     res = evaluate(model_gb, X_test, y_test)

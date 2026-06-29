@@ -96,7 +96,7 @@ def run_rebalancing_comparison():
     print("COMPARAISON DES TECHNIQUES DE REEQUILIBRAGE (modèle : régression logistique)")
     print("=" * 90)
     print(df_results.to_string(index=False))
-    print(f"\nRappel : sur le test (4809 lignes), il y a 712 vraies pannes au total.")
+    print(f"\nRappel : sur le test ({len(y_test)} lignes), il y a {int(y_test.sum())} vraies pannes au total.")
     print("FN = pannes manquées (le plus coûteux en contexte industriel) | FP = fausses alertes")
     df_results.to_csv(RESULTS_DIR / "rebalancing_comparison.csv", index=False)
     print(f"Résultats sauvegardés : {project_relative(RESULTS_DIR / 'rebalancing_comparison.csv')}")
