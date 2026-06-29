@@ -278,14 +278,13 @@ def run_final_comparison():
 Critères non quantifiables directement par le code, discutés qualitativement :
 - Interprétabilité : RF et Hist GB ont tous deux une feature importance native ; jugés équivalents
   (vérification détaillée prévue en Phase E : feature importance, permutation importance, SHAP).
-- Cohérence métier : RF a un meilleur Recall (moins de FN), Hist GB une meilleure Precision (moins de FP) ;
-  le choix dépend de la priorité métier (ici : compromis acceptable vu l'écart minime).
+- Cohérence métier : Hist GB obtient le meilleur compromis global : meilleur F1,
+  meilleur Recall, moins de faux négatifs, modèle plus léger et inférence plus rapide.
 """)
 
     # Décision finale
-    # Hist Gradient Boosting retenu : performance quasi identique à Random Forest
-    # (écart de F1 < 0.001), mais net avantage sur le coût de calcul et le
-    # déploiement
+    # Hist Gradient Boosting retenu : meilleur F1/Recall après optimisation,
+    # modèle plus léger que Random Forest et inférence plus rapide.
     final_model = models["Hist Gradient Boosting"]
     joblib.dump(final_model, MODELS_DIR / "final_model.pkl")
     df_summary.to_csv(RESULTS_DIR / "final_model_comparison.csv", index=False)
@@ -294,10 +293,12 @@ Critères non quantifiables directement par le code, discutés qualitativement :
     selection_note = (
         "# Choix du modèle final\n\n"
         "Modèle retenu : Hist Gradient Boosting.\n\n"
-        "Justification : performance très proche du Random Forest, coût de prédiction "
-        "nettement plus faible, taille de fichier réduite et intégration Streamlit simple. "
-        "Les seuils de décision utilisés pour l'évaluation finale ont été sélectionnés sur "
-        "une validation interne du train set, puis appliqués une seule fois au test set.\n"
+        "Justification : après optimisation des hyperparamètres, Hist Gradient Boosting "
+        "obtient le meilleur compromis global : meilleur F1/Recall, faible nombre de faux "
+        "négatifs, coût de prédiction inférieur au Random Forest, taille de fichier réduite "
+        "et intégration Streamlit simple. Les seuils de décision utilisés pour l'évaluation "
+        "finale ont été sélectionnés sur une validation interne avec les mêmes hyperparamètres "
+        "que les modèles finaux, puis appliqués une seule fois au test set.\n"
     )
     (RESULTS_DIR / "final_model_selection.md").write_text(selection_note, encoding="utf-8")
     print(f">>> MODÈLE FINAL RETENU : Hist Gradient Boosting")

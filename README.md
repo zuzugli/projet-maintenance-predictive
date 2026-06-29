@@ -119,14 +119,14 @@ Les fichiers de résultats sont exportés dans `outputs/results/` :
 | Modèle | F1 | Recall | ROC-AUC | Seuil retenu |
 |---|---|---|---|---|
 | Régression Logistique | 0.765 | 0.862 | 0.959 | 0.60 |
-| Random Forest | 0.890 | 0.928 | 0.994 | 0.55 |
-| **Hist Gradient Boosting (retenu)** | **0.914** | **0.934** | **0.996** | **0.70** |
-| MLP (Deep Learning) | 0.820 | 0.885 | 0.981 | 0.75 |
+| Random Forest | 0.898 | 0.912 | 0.994 | 0.45 |
+| **Hist Gradient Boosting (retenu)** | **0.916** | **0.940** | **0.995** | **0.70** |
+| MLP (Deep Learning) | 0.811 | 0.900 | 0.980 | 0.65 |
 
 Les seuils sont sélectionnés sur un split de validation interne du train set, puis évalués une seule fois sur le test set. Les hyperparamètres sont optimisés par RandomizedSearchCV (modèles sklearn) et recherche aléatoire manuelle (MLP).
 
 **Modèle retenu : Hist Gradient Boosting**
-Après optimisation des hyperparamètres, HistGB est le meilleur modèle sur tous les critères : F1 = 0.914 (vs 0.890 pour RF), 111x plus léger (344 Ko vs 38 084 Ko) et 13x plus rapide en prédiction (4.08 ms vs 51.53 ms).
+Après optimisation des hyperparamètres, HistGB est le meilleur compromis global : F1 = 0.916 (vs 0.898 pour RF), recall = 0.940 (vs 0.912 pour RF), environ 120x plus léger (346 Ko vs 41 541 Ko) et environ 24x plus rapide en prédiction (1.41 ms vs 33.30 ms).
 
 ### Variables les plus importantes
 1. Vitesse de rotation (RPM) - 40%
