@@ -360,18 +360,6 @@ def main():
         )
         st.plotly_chart(fig_cm, use_container_width=True)
 
-        col_fn, col_fp = st.columns(2)
-        col_fn.metric(
-            "Pannes manquées - FN",
-            cm["FN"],
-            help="Faux Négatifs : la machine va tomber en panne mais le modèle dit 'pas de risque'. Coût le plus élevé.",
-        )
-        col_fp.metric(
-            "Fausses alertes - FP",
-            cm["FP"],
-            help="Faux Positifs : le modèle déclenche une alerte inutile. Coût en interventions préventives non nécessaires.",
-        )
-
         # --- Écoresponsabilité ---
         st.divider()
         st.subheader("Écoresponsabilité des modèles")
