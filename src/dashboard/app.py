@@ -492,7 +492,7 @@ def main():
             st.image(
                 str(shap_path),
                 caption="SHAP Summary Plot - rouge : la valeur élevée de la variable pousse vers une prédiction de panne ; bleu : elle pousse vers l'absence de panne.",
-                use_container_width=True,
+                use_column_width=True,
             )
         else:
             st.warning("Figure SHAP non trouvée. Lancez `src/models/interpretability.py` pour la générer.")
