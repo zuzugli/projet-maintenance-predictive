@@ -1,5 +1,5 @@
 model,f1,recall,cv_f1_mean,cv_f1_std,train_time_s,predict_time_ms,model_size_kb
-Régression Logistique,0.7646,0.8624,0.7459,0.0106,0.2049,0.728,1.6396
-Random Forest,0.8983,0.9115,0.8938,0.0073,0.7956,33.2962,41540.7119
-Hist Gradient Boosting,0.9164,0.9396,0.9012,0.0168,0.2666,1.4131,345.6953
-MLP (Deep Learning),0.8109,0.9003,0.7919,0.0057,,50.7342,65.3008
+Régression Logistique,0.7646,0.8624,0.7459,0.0106,0.0345,0.642,1.5303
+Random Forest,0.8902,0.9284,0.8927,0.0099,1.9729,47.6867,38084.04
+Hist Gradient Boosting,0.9135,0.934,0.8953,0.0073,1.4922,3.4482,343.8203
+MLP (Deep Learning),0.8203,0.8848,0.7898,0.0179,,58.1113,41.291

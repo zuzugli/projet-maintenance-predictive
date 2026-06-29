@@ -110,14 +110,14 @@ def load_comparison_data():
 
     return pd.DataFrame({
         "Modèle": ["Régression Logistique", "Random Forest", "Hist Gradient Boosting (retenu)", "MLP (Deep Learning)"],
-        "F1-score": [0.7646, 0.8983, 0.9164, 0.8109],
-        "Recall": [0.8624, 0.9115, 0.9396, 0.9003],
-        "Precision": [0.6868, 0.8854, 0.8944, 0.7376],
-        "ROC-AUC": [0.9589, 0.9939, 0.9953, 0.9798],
-        "PR-AUC": [0.8379, 0.9664, 0.9745, 0.8935],
-        "Temps prédiction (ms)": [0.73, 33.30, 1.41, 50.73],
-        "Taille fichier (Ko)": [1.6, 41540.7, 345.7, 65.3],
-        "Seuil retenu": [0.60, 0.45, 0.70, 0.65],
+        "F1-score": [0.7646, 0.8902, 0.9135, 0.8203],
+        "Recall": [0.8624, 0.9284, 0.9340, 0.8848],
+        "Precision": [0.6868, 0.8551, 0.8938, 0.7646],
+        "ROC-AUC": [0.9589, 0.9937, 0.9960, 0.9813],
+        "PR-AUC": [0.8379, 0.9656, 0.9794, 0.8976],
+        "Temps prédiction (ms)": [0.64, 47.69, 3.45, 58.11],
+        "Taille fichier (Ko)": [1.5, 38084.0, 343.8, 41.3],
+        "Seuil retenu": [0.60, 0.55, 0.70, 0.75],
     })
 
 
@@ -148,9 +148,9 @@ def load_confusion_matrices():
     # Valeurs calculées à chaque seuil optimal (maximise F1) sur le test set (4809 lignes, 712 positifs)
     return {
         "Régression Logistique":          {"TN": 3817, "FP": 280, "FN": 98,  "TP": 614, "seuil": 0.60},
-        "Random Forest":                   {"TN": 4013, "FP": 84,  "FN": 63,  "TP": 649, "seuil": 0.45},
-        "Hist Gradient Boosting (retenu)": {"TN": 4018, "FP": 79,  "FN": 43,  "TP": 669, "seuil": 0.70},
-        "MLP (Deep Learning)":             {"TN": 3869, "FP": 228, "FN": 71,  "TP": 641, "seuil": 0.65},
+        "Random Forest":                   {"TN": 3985, "FP": 112, "FN": 51,  "TP": 661, "seuil": 0.55},
+        "Hist Gradient Boosting (retenu)": {"TN": 4018, "FP": 79,  "FN": 47,  "TP": 665, "seuil": 0.70},
+        "MLP (Deep Learning)":             {"TN": 3903, "FP": 194, "FN": 82,  "TP": 630, "seuil": 0.75},
     }
 
 
@@ -175,10 +175,10 @@ def load_feature_importance():
         return df[["Variable", "Importance"]].sort_values("Importance", ascending=False).head(10)
 
     return pd.DataFrame({
-        "Variable": ["Vitesse de rotation (rpm)", "Température moteur", "Courant électrique",
-                     "Vibration", "Pression", "Mode 'peak'", "Mode 'idle'",
-                     "Heures depuis maintenance"],
-        "Importance": [0.4110, 0.2622, 0.2104, 0.1930, 0.0715, 0.0421, 0.0147, 0.0114],
+        "Variable": ["Vitesse de rotation (rpm)", "Température moteur", "Vibration",
+                     "Courant électrique", "Heures depuis maintenance", "Pression",
+                     "Mode 'idle'", "Mode 'peak'"],
+        "Importance": [0.4036, 0.3139, 0.1729, 0.1636, 0.0804, 0.0570, 0.0187, 0.0173],
     })
 
 
@@ -384,9 +384,9 @@ def main():
             k2.metric("Temps prédiction HistGB", f"{gb_time:.2f} ms", delta=f"-{time_pct:.0f} % vs Random Forest", delta_color="normal")
             k3.metric("Taille Random Forest", f"{rf_size:.0f} Ko", help=f"{rf_size/gb_size:.0f}x plus lourd que HistGB")
         else:
-            k1.metric("Taille HistGB (retenu)", "346 Ko", delta="-99 % vs Random Forest", delta_color="normal")
-            k2.metric("Temps prédiction HistGB", "1.41 ms", delta="-96 % vs Random Forest", delta_color="normal")
-            k3.metric("Taille Random Forest", "41 541 Ko", help="120x plus lourd que HistGB")
+            k1.metric("Taille HistGB (retenu)", "344 Ko", delta="-99 % vs Random Forest", delta_color="normal")
+            k2.metric("Temps prédiction HistGB", "3.45 ms", delta="-93 % vs Random Forest", delta_color="normal")
+            k3.metric("Taille Random Forest", "38 084 Ko", help="111x plus lourd que HistGB")
 
         fig_eco = px.bar(
             df_comp.dropna(subset=["Temps prédiction (ms)"]),
@@ -437,8 +437,8 @@ def main():
         else:
             conclusion = (
                 "**Hist Gradient Boosting** a été sélectionné comme modèle final. "
-                "Meilleur compromis performance (F1 = 0.916 vs 0.898 pour le Random Forest), "
-                "légèreté (346 Ko vs 41 541 Ko) et vitesse de prédiction (1.41 ms vs 33.30 ms). "
+                "Meilleur compromis performance (F1 = 0.914 vs 0.890 pour le Random Forest), "
+                "légèreté (344 Ko vs 38 084 Ko) et vitesse de prédiction (3.45 ms vs 47.69 ms). "
                 "Sa stabilité en validation croisée, sa facilité de déploiement et son interprétabilité native "
                 "en font le meilleur compromis pour un usage industriel."
             )

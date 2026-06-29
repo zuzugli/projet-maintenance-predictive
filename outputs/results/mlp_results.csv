@@ -1,2 +1,2 @@
 recall,f1,roc_auc,pr_auc,FN,FP,model,train_time_s,n_epochs,best_units_1,best_units_2,best_dropout,best_learning_rate,best_batch_size
-0.9424,0.7889,0.9798,0.8935,41,318,MLP (Deep Learning),13.7833,27,64,32,0.1,0.01,64
+0.9466,0.7925,0.9813,0.8976,38,315,MLP (Deep Learning),14.0486,33,32,16,0.1,0.005,64
