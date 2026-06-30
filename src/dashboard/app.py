@@ -251,9 +251,6 @@ def main():
             X_input = build_input_features(vibration, temperature, current, pressure, rpm,
                                            hours_maintenance, ambient_temp, machine_type, operating_mode)
             X_processed = preprocessor.transform(X_input)
-            # On remet les noms de colonnes après transform (le modèle a été
-            # entraîné avec un DataFrame nommé ; sans ça, sklearn émet un
-            # warning inoffensif, mais propre à éviter)
             X_processed = pd.DataFrame(X_processed, columns=preprocessor.get_feature_names_out())
             proba = model.predict_proba(X_processed)[0, 1]
 
@@ -294,6 +291,14 @@ def main():
     # ONGLET 2 : COMPARAISON DES MODÈLES + ÉCORESPONSABILITÉ
     # ============================================================
     with tab2:
+        st.markdown(
+            "<div style='background:#eef2ff;padding:8px 14px;border-left:4px solid #6366f1;"
+            "border-radius:4px;margin-bottom:16px;'>"
+            "<span style='color:#4338ca;font-size:0.85em;font-weight:600;'>"
+            "🔬 Espace Data Science - section réservée à l'équipe technique"
+            "</span></div>",
+            unsafe_allow_html=True,
+        )
         st.header("Comparaison des 4 modèles testés")
         st.write("Modèle retenu : **Hist Gradient Boosting** - meilleur compromis performance / coût de calcul / facilité de déploiement.")
 
@@ -448,6 +453,14 @@ def main():
     # ONGLET 3 : IMPORTANCE DES VARIABLES + SHAP
     # ============================================================
     with tab3:
+        st.markdown(
+            "<div style='background:#eef2ff;padding:8px 14px;border-left:4px solid #6366f1;"
+            "border-radius:4px;margin-bottom:16px;'>"
+            "<span style='color:#4338ca;font-size:0.85em;font-weight:600;'>"
+            "🔬 Espace Data Science - section réservée à l'équipe technique"
+            "</span></div>",
+            unsafe_allow_html=True,
+        )
         st.header("Quelles variables influencent le plus les prédictions ?")
         st.write("Mesuré par Permutation Importance sur le modèle final (Hist Gradient Boosting).")
 
@@ -489,6 +502,14 @@ def main():
     # ONGLET 4 : EXPLORATION DES DONNÉES
     # ============================================================
     with tab4:
+        st.markdown(
+            "<div style='background:#eef2ff;padding:8px 14px;border-left:4px solid #6366f1;"
+            "border-radius:4px;margin-bottom:16px;'>"
+            "<span style='color:#4338ca;font-size:0.85em;font-weight:600;'>"
+            "🔬 Espace Data Science - section réservée à l'équipe technique"
+            "</span></div>",
+            unsafe_allow_html=True,
+        )
         st.header("Exploration des données")
         df = load_raw_data()
         df_labeled = df.copy()
